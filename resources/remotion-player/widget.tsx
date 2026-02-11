@@ -47,24 +47,61 @@ function calculateTotalDuration(scenes: SceneData[]): number {
 type WidgetProps = z.infer<typeof propSchema>;
 
 const RemotionPlayerWidget: React.FC = () => {
-  const { props, isPending, theme, sendFollowUpMessage, requestDisplayMode } =
-    useWidget();
+  const {
+    props,
+    isPending,
+    theme,
+    sendFollowUpMessage,
+    requestDisplayMode,
+    toolInput,
+  } = useWidget();
   const playerRef = useRef<PlayerRef>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
 
   const widgetProps = props as Partial<WidgetProps>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawInput = toolInput as any;
 
   const composition = useMemo<CompositionData | null>(() => {
-    if (!widgetProps?.composition) return null;
-    try {
-      setParseError(null);
-      return JSON.parse(widgetProps.composition);
-    } catch (e) {
-      setParseError("Failed to parse composition data");
-      return null;
+    // Strategy 1: widget-specific props (contains pre-built composition JSON)
+    if (widgetProps?.composition) {
+      try {
+        setParseError(null);
+        return JSON.parse(widgetProps.composition);
+      } catch (e) {
+        setParseError("Failed to parse composition data");
+        return null;
+      }
     }
-  }, [widgetProps?.composition]);
+
+    // Strategy 2: reconstruct from toolInput (raw tool arguments)
+    // This is the fallback for environments where widget props don't arrive
+    // but the original tool arguments (title, scenes, etc.) are available.
+    if (rawInput?.scenes) {
+      try {
+        setParseError(null);
+        const parsedScenes =
+          typeof rawInput.scenes === "string"
+            ? JSON.parse(rawInput.scenes)
+            : rawInput.scenes;
+        return {
+          meta: {
+            title: rawInput.title || "Untitled",
+            width: rawInput.width || 1920,
+            height: rawInput.height || 1080,
+            fps: rawInput.fps || 30,
+          },
+          scenes: parsedScenes,
+        };
+      } catch (e) {
+        setParseError("Failed to parse scene data");
+        return null;
+      }
+    }
+
+    return null;
+  }, [widgetProps?.composition, rawInput?.scenes, rawInput?.title, rawInput?.width, rawInput?.height, rawInput?.fps]);
 
   const totalDuration = useMemo(() => {
     if (!composition?.scenes) return 1;
