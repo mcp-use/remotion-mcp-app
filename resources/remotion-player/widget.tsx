@@ -44,6 +44,75 @@ function calculateTotalDuration(scenes: SceneData[]): number {
   return Math.max(total, 1);
 }
 
+/**
+ * Try to parse scenes from a value that may be:
+ * - A complete JSON array (object)
+ * - A complete JSON string
+ * - An incomplete/streaming JSON string (partial)
+ * Returns whatever valid scenes we can extract, or empty array.
+ */
+function tryParseScenes(raw: unknown): SceneData[] {
+  if (!raw) return [];
+
+  // Already an array — filter to only complete scene objects
+  if (Array.isArray(raw)) {
+    return raw.filter(
+      (s) => s && typeof s === "object" && s.id && s.durationInFrames && s.background
+    );
+  }
+
+  if (typeof raw !== "string" || raw.trim().length === 0) return [];
+
+  // Try parsing the full string
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (s: any) => s && typeof s === "object" && s.id && s.durationInFrames && s.background
+      );
+    }
+    return [];
+  } catch {
+    // Incomplete JSON — try to extract complete scene objects
+    // Find the last complete object in the array by looking for matching braces
+    return extractPartialScenes(raw);
+  }
+}
+
+/**
+ * Extract complete scene objects from a partially streamed JSON array string.
+ * e.g. '[{"id":"s1",...},{"id":"s2",...},{"id":"s3' → first 2 scenes
+ */
+function extractPartialScenes(raw: string): SceneData[] {
+  const scenes: SceneData[] = [];
+  let depth = 0;
+  let objectStart = -1;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === "{") {
+      if (depth === 0) objectStart = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && objectStart >= 0) {
+        const chunk = raw.slice(objectStart, i + 1);
+        try {
+          const obj = JSON.parse(chunk);
+          if (obj.id && obj.durationInFrames && obj.background) {
+            scenes.push(obj);
+          }
+        } catch {
+          // incomplete object, skip
+        }
+        objectStart = -1;
+      }
+    }
+  }
+
+  return scenes;
+}
+
 type WidgetProps = z.infer<typeof propSchema>;
 
 const RemotionPlayerWidget: React.FC = () => {
@@ -63,8 +132,27 @@ const RemotionPlayerWidget: React.FC = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawInput = toolInput as any;
 
-  const composition = useMemo<CompositionData | null>(() => {
-    // Strategy 1: widget-specific props (contains pre-built composition JSON)
+  // --- Streaming preview: extract what we can from toolInput while pending ---
+  const streamingComposition = useMemo<CompositionData | null>(() => {
+    if (!rawInput) return null;
+
+    const scenes = tryParseScenes(rawInput.scenes);
+    if (scenes.length === 0 && !rawInput.title) return null;
+
+    return {
+      meta: {
+        title: rawInput.title || "Untitled",
+        width: rawInput.width || 1920,
+        height: rawInput.height || 1080,
+        fps: rawInput.fps || 30,
+      },
+      scenes,
+    };
+  }, [rawInput?.scenes, rawInput?.title, rawInput?.width, rawInput?.height, rawInput?.fps]);
+
+  // --- Final composition: from props or toolInput (after tool completes) ---
+  const finalComposition = useMemo<CompositionData | null>(() => {
+    // Strategy 1: widget-specific props
     if (widgetProps?.composition) {
       try {
         setParseError(null);
@@ -75,25 +163,25 @@ const RemotionPlayerWidget: React.FC = () => {
       }
     }
 
-    // Strategy 2: reconstruct from toolInput (raw tool arguments)
-    // This is the fallback for environments where widget props don't arrive
-    // but the original tool arguments (title, scenes, etc.) are available.
-    if (rawInput?.scenes) {
+    // Strategy 2: reconstruct from toolInput (after tool completes)
+    if (!isPending && rawInput?.scenes) {
       try {
         setParseError(null);
         const parsedScenes =
           typeof rawInput.scenes === "string"
             ? JSON.parse(rawInput.scenes)
             : rawInput.scenes;
-        return {
-          meta: {
-            title: rawInput.title || "Untitled",
-            width: rawInput.width || 1920,
-            height: rawInput.height || 1080,
-            fps: rawInput.fps || 30,
-          },
-          scenes: parsedScenes,
-        };
+        if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
+          return {
+            meta: {
+              title: rawInput.title || "Untitled",
+              width: rawInput.width || 1920,
+              height: rawInput.height || 1080,
+              fps: rawInput.fps || 30,
+            },
+            scenes: parsedScenes,
+          };
+        }
       } catch (e) {
         setParseError("Failed to parse scene data");
         return null;
@@ -101,10 +189,13 @@ const RemotionPlayerWidget: React.FC = () => {
     }
 
     return null;
-  }, [widgetProps?.composition, rawInput?.scenes, rawInput?.title, rawInput?.width, rawInput?.height, rawInput?.fps]);
+  }, [isPending, widgetProps?.composition, rawInput?.scenes, rawInput?.title, rawInput?.width, rawInput?.height, rawInput?.fps]);
+
+  // Use streaming composition while pending, final when done
+  const composition = isPending ? streamingComposition : finalComposition;
 
   const totalDuration = useMemo(() => {
-    if (!composition?.scenes) return 1;
+    if (!composition?.scenes?.length) return 1;
     return calculateTotalDuration(composition.scenes);
   }, [composition?.scenes]);
 
@@ -121,7 +212,7 @@ const RemotionPlayerWidget: React.FC = () => {
     try {
       await requestDisplayMode("fullscreen");
     } catch {
-      // If requestDisplayMode fails (e.g. not in Apps SDK), still enter edit mode
+      // If requestDisplayMode fails, still enter edit mode
     }
     setIsEditMode(true);
   }, [requestDisplayMode]);
@@ -135,29 +226,102 @@ const RemotionPlayerWidget: React.FC = () => {
     }
   }, [requestDisplayMode]);
 
+  // --- Pending state with live streaming preview ---
   if (isPending) {
+    const hasScenes = composition && composition.scenes.length > 0;
+    const title = rawInput?.title;
+
     return (
       <McpUseProvider autoSize>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: 280,
-            backgroundColor: bgPrimary,
             borderRadius: 12,
+            overflow: "hidden",
+            backgroundColor: bgPrimary,
             fontFamily: "sans-serif",
           }}
         >
-          <div style={{ textAlign: "center", color: textSecondary }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>&#127916;</div>
-            <div style={{ fontSize: 14 }}>Creating composition...</div>
+          {/* Streaming header */}
+          <div
+            style={{
+              padding: "10px 16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              backgroundColor: bgSecondary,
+              borderBottom: `1px solid ${borderColor}`,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                color: textPrimary,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              <StreamingDot color={accent} />
+              <span>{title || "Creating composition..."}</span>
+            </div>
+            <div style={{ fontSize: 11, color: textSecondary, display: "flex", gap: 12 }}>
+              {rawInput?.width && rawInput?.height && (
+                <span>{rawInput.width}x{rawInput.height}</span>
+              )}
+              {rawInput?.fps && <span>{rawInput.fps}fps</span>}
+              {hasScenes && (
+                <span>
+                  {composition!.scenes.length} scene{composition!.scenes.length !== 1 ? "s" : ""} loaded
+                </span>
+              )}
+            </div>
           </div>
+
+          {/* Live player preview or loading placeholder */}
+          {hasScenes ? (
+            <div style={{ backgroundColor: "#000" }}>
+              <Player
+                ref={playerRef}
+                component={DynamicComposition}
+                inputProps={{ scenes: composition!.scenes }}
+                durationInFrames={totalDuration}
+                fps={composition!.meta.fps}
+                compositionWidth={composition!.meta.width}
+                compositionHeight={composition!.meta.height}
+                controls
+                autoPlay
+                loop
+                style={{ width: "100%" }}
+              />
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 280,
+                backgroundColor: bgPrimary,
+              }}
+            >
+              <div style={{ textAlign: "center", color: textSecondary }}>
+                <StreamingDot color={accent} size={32} />
+                <div style={{ fontSize: 14, marginTop: 16 }}>
+                  {title ? `Building scenes for "${title}"...` : "Generating composition..."}
+                </div>
+                <div style={{ fontSize: 11, marginTop: 6, opacity: 0.6 }}>
+                  Preview will appear as scenes stream in
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </McpUseProvider>
     );
   }
 
+  // --- Error state ---
   if (parseError || !composition) {
     return (
       <McpUseProvider autoSize>
@@ -178,6 +342,7 @@ const RemotionPlayerWidget: React.FC = () => {
     );
   }
 
+  // --- Edit mode ---
   if (isEditMode) {
     return (
       <McpUseProvider autoSize>
@@ -191,7 +356,7 @@ const RemotionPlayerWidget: React.FC = () => {
     );
   }
 
-  // View Mode
+  // --- View mode (final) ---
   const meta = composition.meta || {
     title: "Untitled",
     width: 1920,
@@ -292,6 +457,41 @@ const RemotionPlayerWidget: React.FC = () => {
         </div>
       </div>
     </McpUseProvider>
+  );
+};
+
+// --- Pulsing dot indicator for streaming state ---
+const StreamingDot: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 10,
+}) => {
+  const [opacity, setOpacity] = useState(1);
+
+  useEffect(() => {
+    let frame: number;
+    let start: number;
+    const animate = (ts: number) => {
+      if (!start) start = ts;
+      const elapsed = (ts - start) % 1200;
+      setOpacity(0.3 + 0.7 * Math.abs(Math.sin((elapsed / 1200) * Math.PI)));
+      frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        backgroundColor: color,
+        opacity,
+        transition: "opacity 0.1s",
+      }}
+    />
   );
 };
 
