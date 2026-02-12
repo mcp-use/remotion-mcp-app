@@ -44,7 +44,7 @@ class PlayerErrorBoundary extends Component<
   }
 }
 
-const VERSION = "0.1.6";
+const VERSION = "0.1.7";
 
 const propSchema = z.object({
   composition: z.string().describe("JSON string of the composition"),
@@ -163,8 +163,15 @@ export default function RemotionPlayerWidget() {
 
   const streamingComp = useMemo(() => (!isFinal ? buildComposition(toolInput) : null), [isFinal, toolInput]);
   const finalComp = useMemo(() => resultComp || (isFinal ? buildComposition(toolInput) : null), [resultComp, isFinal, toolInput]);
-  const comp = finalComp || streamingComp;
-  const isStreaming = !isFinal && !!streamingComp;
+
+  // Keep previous composition visible while next one loads
+  const prevCompRef = useRef<CompositionData | null>(null);
+  useEffect(() => {
+    if (finalComp) prevCompRef.current = finalComp;
+  }, [finalComp]);
+
+  const comp = finalComp || streamingComp || prevCompRef.current;
+  const isStreaming = !isFinal && !finalComp;
   const dur = useMemo(() => comp?.scenes ? totalDuration(comp.scenes) : 1, [comp?.scenes]);
 
   const download = useCallback(() => {
