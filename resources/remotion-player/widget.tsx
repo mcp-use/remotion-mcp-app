@@ -6,7 +6,7 @@ import { Player, type PlayerRef } from "@remotion/player";
 import { DynamicComposition } from "./components/DynamicComposition";
 import type { CompositionData, SceneData } from "../../types";
 
-const VERSION = "0.1.3";
+const VERSION = "0.1.4";
 
 const propSchema = z.object({
   composition: z.string().describe("JSON string of the composition"),
@@ -131,13 +131,15 @@ export default function RemotionPlayerWidget() {
 
   const download = useCallback(() => {
     if (!comp) return;
-    const blob = new Blob([JSON.stringify(comp, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+    const json = JSON.stringify(comp, null, 2);
+    const name = `${comp.meta.title || "composition"}.json`;
+    // Try data URL download (works in some sandboxed iframes)
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `${comp.meta.title || "composition"}.json`;
+    a.href = "data:application/json;charset=utf-8," + encodeURIComponent(json);
+    a.download = name;
     a.click();
-    URL.revokeObjectURL(url);
+    // Also try openExternal as fallback (opens in new tab)
+    try { appRef.current?.openExternal?.({ href: "data:application/json;charset=utf-8," + encodeURIComponent(json) }); } catch {}
   }, [comp]);
 
   // Tell the host how tall we want to be
