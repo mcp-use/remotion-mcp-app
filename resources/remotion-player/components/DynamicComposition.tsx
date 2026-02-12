@@ -34,7 +34,7 @@ export const DynamicComposition: React.FC<{ scenes: SceneData[] }> = ({
     return (
       <AbsoluteFill
         style={{
-          backgroundColor: "#1a1a2e",
+          backgroundColor: "#141414",
           justifyContent: "center",
           alignItems: "center",
         }}
