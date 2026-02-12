@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { z } from "zod";
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import { Player, type PlayerRef } from "@remotion/player";
@@ -88,7 +88,6 @@ function extractPartialScenes(raw: string): SceneData[] {
 // Intercept tool-input-partial from postMessage (mcp-use drops these)
 function useStreamingToolInput() {
   const [partialInput, setPartialInput] = useState<Record<string, unknown> | null>(null);
-
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const data = event.data;
@@ -112,14 +111,34 @@ function useStreamingToolInput() {
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, []);
-
   return partialInput;
 }
 
+// Persist fullscreen state across remounts
+const FS_KEY = "remotion-mcp-fullscreen";
+const COMP_KEY = "remotion-mcp-composition";
+
+function persistFullscreen(v: boolean) {
+  try { localStorage.setItem(FS_KEY, v ? "1" : "0"); } catch { /* noop */ }
+}
+function loadFullscreen(): boolean {
+  try { return localStorage.getItem(FS_KEY) === "1"; } catch { /* noop */ }
+  return false;
+}
+function persistComp(c: CompositionData) {
+  try { localStorage.setItem(COMP_KEY, JSON.stringify(c)); } catch { /* noop */ }
+}
+function loadComp(): CompositionData | null {
+  try { const r = localStorage.getItem(COMP_KEY); if (r) return JSON.parse(r); } catch { /* noop */ }
+  return null;
+}
+
 const RemotionPlayerWidget: React.FC = () => {
-  const { props, isPending, theme, toolInput } = useWidget();
+  const { props, isPending, theme, requestDisplayMode, toolInput } = useWidget();
   const partialInput = useStreamingToolInput();
   const playerRef = useRef<PlayerRef>(null);
+  const [isFullscreen, setIsFullscreen] = useState(() => loadFullscreen());
+  const [persisted] = useState<CompositionData | null>(() => loadComp());
 
   const widgetProps = props as Partial<{ composition: string }>;
   const rawInput = toolInput as Record<string, unknown> | undefined;
@@ -141,7 +160,7 @@ const RemotionPlayerWidget: React.FC = () => {
     };
   }, [partialInput, isPending, rawInput]);
 
-  // Final composition from props or toolInput
+  // Final composition from props, toolInput, or persisted
   const finalComposition = useMemo<CompositionData | null>(() => {
     if (widgetProps?.composition) {
       try { return JSON.parse(widgetProps.composition); } catch { /* noop */ }
@@ -166,8 +185,14 @@ const RemotionPlayerWidget: React.FC = () => {
         };
       }
     }
+    if (persisted) return persisted;
     return null;
-  }, [widgetProps?.composition, isPending, rawInput]);
+  }, [widgetProps?.composition, isPending, rawInput, persisted]);
+
+  // Persist composition for fullscreen remount survival
+  useEffect(() => {
+    if (finalComposition) persistComp(finalComposition);
+  }, [finalComposition]);
 
   const isStreaming = isPending || !!partialInput;
   const composition = finalComposition || streamingComposition;
@@ -184,22 +209,29 @@ const RemotionPlayerWidget: React.FC = () => {
   const textSecondary = isDark ? "#777777" : "#888888";
   const borderColor = isDark ? "#2a2a2a" : "#e0e0e0";
 
+  const enterFullscreen = useCallback(async () => {
+    if (finalComposition) persistComp(finalComposition);
+    persistFullscreen(true);
+    setIsFullscreen(true);
+    try { await requestDisplayMode("fullscreen"); } catch { /* noop */ }
+  }, [finalComposition, requestDisplayMode]);
+
+  const exitFullscreen = useCallback(async () => {
+    setIsFullscreen(false);
+    persistFullscreen(false);
+    try { await requestDisplayMode("inline"); } catch { /* noop */ }
+  }, [requestDisplayMode]);
+
   // Loading
   if (!composition) {
     const title = partialInput?.title || rawInput?.title;
     return (
       <McpUseProvider autoSize>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: 240,
-            backgroundColor: bgPrimary,
-            borderRadius: 8,
-            fontFamily: "system-ui, -apple-system, sans-serif",
-          }}
-        >
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          minHeight: 240, backgroundColor: bgPrimary, borderRadius: 8,
+          fontFamily: "system-ui, -apple-system, sans-serif",
+        }}>
           <div style={{ textAlign: "center", color: textSecondary }}>
             <LoadingDot />
             <div style={{ fontSize: 13, marginTop: 12 }}>
@@ -215,26 +247,74 @@ const RemotionPlayerWidget: React.FC = () => {
   const sceneCount = composition.scenes?.length || 0;
   const durationSec = (totalDuration / meta.fps).toFixed(1);
 
+  // Fullscreen: just the player, big, with a close button
+  if (isFullscreen) {
+    return (
+      <McpUseProvider>
+        <div style={{
+          display: "flex", flexDirection: "column", height: "100vh",
+          backgroundColor: "#000", fontFamily: "system-ui, -apple-system, sans-serif",
+        }}>
+          <div style={{
+            padding: "8px 14px", display: "flex", alignItems: "center",
+            justifyContent: "space-between", backgroundColor: bgSecondary,
+            borderBottom: `1px solid ${borderColor}`, flexShrink: 0,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, color: textPrimary, fontSize: 13, fontWeight: 500 }}>
+              {isStreaming && <LoadingDot />}
+              <span>{meta.title || "Untitled"}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: textSecondary }}>
+              <span>{meta.width}x{meta.height}</span>
+              <span>{meta.fps}fps</span>
+              <span>{sceneCount} scene{sceneCount !== 1 ? "s" : ""}</span>
+              {!isStreaming && <span>{durationSec}s</span>}
+              <button
+                onClick={exitFullscreen}
+                style={{
+                  padding: "3px 10px", fontSize: 11, fontWeight: 500,
+                  border: `1px solid ${borderColor}`, borderRadius: 4,
+                  cursor: "pointer", backgroundColor: "transparent",
+                  color: textPrimary, fontFamily: "inherit",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Player
+              key={isStreaming ? `s-${sceneCount}` : "final"}
+              ref={playerRef}
+              component={DynamicComposition}
+              inputProps={{ scenes: composition.scenes }}
+              durationInFrames={totalDuration}
+              fps={meta.fps}
+              compositionWidth={meta.width}
+              compositionHeight={meta.height}
+              controls
+              autoPlay
+              loop
+              style={{ width: "100%", maxHeight: "100%" }}
+            />
+          </div>
+        </div>
+      </McpUseProvider>
+    );
+  }
+
+  // Inline: compact player with Edit button
   return (
     <McpUseProvider autoSize>
-      <div
-        style={{
-          borderRadius: 8,
-          overflow: "hidden",
-          backgroundColor: bgPrimary,
-          fontFamily: "system-ui, -apple-system, sans-serif",
-        }}
-      >
-        <div
-          style={{
-            padding: "8px 14px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            backgroundColor: bgSecondary,
-            borderBottom: `1px solid ${borderColor}`,
-          }}
-        >
+      <div style={{
+        borderRadius: 8, overflow: "hidden", backgroundColor: bgPrimary,
+        fontFamily: "system-ui, -apple-system, sans-serif",
+      }}>
+        <div style={{
+          padding: "8px 14px", display: "flex", alignItems: "center",
+          justifyContent: "space-between", backgroundColor: bgSecondary,
+          borderBottom: `1px solid ${borderColor}`,
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, color: textPrimary, fontSize: 13, fontWeight: 500 }}>
             {isStreaming && <LoadingDot />}
             <span>{meta.title || "Untitled"}</span>
@@ -244,6 +324,19 @@ const RemotionPlayerWidget: React.FC = () => {
             <span>{meta.fps}fps</span>
             <span>{sceneCount} scene{sceneCount !== 1 ? "s" : ""}</span>
             {!isStreaming && <span>{durationSec}s</span>}
+            {!isStreaming && (
+              <button
+                onClick={enterFullscreen}
+                style={{
+                  padding: "3px 10px", fontSize: 11, fontWeight: 500,
+                  border: `1px solid ${borderColor}`, borderRadius: 4,
+                  cursor: "pointer", backgroundColor: "transparent",
+                  color: textPrimary, fontFamily: "inherit",
+                }}
+              >
+                Edit
+              </button>
+            )}
           </div>
         </div>
         <div style={{ backgroundColor: "#000" }}>
