@@ -87,29 +87,66 @@ function extractPartialScenes(raw: string): SceneData[] {
 
 function useStreamingToolInput() {
   const [partialInput, setPartialInput] = useState<Record<string, unknown> | null>(null);
+
   useEffect(() => {
+    // Strategy 1: Listen for postMessage notifications
     const handler = (event: MessageEvent) => {
       const data = event.data;
       if (!data || typeof data !== "object") return;
+
+      // Log all messages for debugging (remove in production)
+      if (data.jsonrpc || data.type?.startsWith?.("openai")) {
+        console.log("[remotion] postMessage:", data.method || data.type);
+      }
+
+      // MCP Apps protocol
       if (data.jsonrpc === "2.0") {
         const method = data.method || "";
-        if (
-          method === "notifications/tool-input-partial" ||
-          method === "ui/notifications/tool-input-partial"
-        ) {
-          setPartialInput(data.params?.arguments ?? data.params ?? {});
+        if (method.includes("tool-input-partial")) {
+          const args = data.params?.arguments ?? data.params ?? {};
+          console.log("[remotion] partial input:", Object.keys(args));
+          setPartialInput(args);
         }
-        if (
-          method === "notifications/tool-input" ||
-          method === "ui/notifications/tool-input"
-        ) {
+        if (method.includes("tool-input") && !method.includes("partial")) {
+          console.log("[remotion] input complete");
           setPartialInput(null);
+        }
+      }
+
+      // OpenAI Apps SDK: set_globals carries toolInput progressively
+      if (data.type === "openai:set_globals") {
+        const toolInput = data.detail?.globals?.toolInput;
+        if (toolInput && typeof toolInput === "object") {
+          console.log("[remotion] set_globals toolInput:", Object.keys(toolInput));
+          setPartialInput(toolInput);
         }
       }
     };
     window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
+
+    // Strategy 2: Poll window.openai.toolInput (Apps SDK exposes it directly)
+    let pollTimer: ReturnType<typeof setInterval> | undefined;
+    const openai = (window as any).openai;
+    if (openai) {
+      let lastSceneLen = 0;
+      pollTimer = setInterval(() => {
+        const ti = openai.toolInput;
+        if (ti && typeof ti === "object" && ti.scenes) {
+          const currentLen = typeof ti.scenes === "string" ? ti.scenes.length : JSON.stringify(ti.scenes).length;
+          if (currentLen !== lastSceneLen) {
+            lastSceneLen = currentLen;
+            setPartialInput({ ...ti });
+          }
+        }
+      }, 300);
+    }
+
+    return () => {
+      window.removeEventListener("message", handler);
+      if (pollTimer) clearInterval(pollTimer);
+    };
   }, []);
+
   return partialInput;
 }
 
