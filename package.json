@@ -21,6 +21,7 @@
     "deploy": "mcp-use deploy"
   },
   "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@remotion/player": "4.0.268",
     "@remotion/transitions": "4.0.268",
     "mcp-use": "latest",
