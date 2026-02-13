@@ -1,39 +1,33 @@
-export const RULE_INDEX = `# Remotion MCP - Composition Format Guide
+export const RULE_INDEX = `# Remotion MCP — Video Creation Guide
 
-Create video compositions by defining scenes with elements and animations.
-Each composition has metadata (title, dimensions, fps) and an array of scenes.
-Scenes contain positioned elements (text, shapes, images) with optional enter/exit animations.
+Two modes:
+1. **JSON mode** (create_composition) — Define scenes as JSON. Simpler, supports streaming preview.
+2. **Code mode** (create_video) — Write React component code. Full Remotion API access.
 
 ## Available Rules
 
-Call these tools to learn specific topics before creating a composition:
+- **rule_scene_format** - Scene structure, backgrounds, element positioning (JSON mode)
+- **rule_text_elements** - Text properties (JSON mode)
+- **rule_shape_elements** - Shape types, fill, stroke (JSON mode)
+- **rule_image_elements** - Image src, objectFit (JSON mode)
+- **rule_animations** - Enter/exit animations, spring configs (JSON mode)
+- **rule_transitions** - Scene transitions, duration calculation (JSON mode)
+- **rule_timing** - FPS guide, duration patterns (both modes)
+- **rule_examples** - Full working examples, color palettes (JSON mode)
+- **rule_react_code** - React.createElement API reference, all available imports, examples (Code mode)
 
-- **rule_scene_format** - Scene structure, backgrounds (solid/gradient), element positioning (x/y percentages)
-- **rule_text_elements** - Text properties: fontSize, fontWeight, color, fontFamily, textAlign, lineHeight, backgroundColor, padding
-- **rule_shape_elements** - Shape types (rectangle, circle, ellipse, line), fill, stroke, borderRadius, shadow
-- **rule_image_elements** - Image src, objectFit, borderRadius
-- **rule_animations** - Enter/exit animations: fade, slide, scale, spring, bounce, rotate, blur, typewriter + spring config presets
-- **rule_transitions** - Scene-to-scene transitions: fade, slide, wipe, flip, clockWipe + duration calculation
-- **rule_timing** - FPS guide, duration in frames, common timing patterns, staggered entrances
-- **rule_examples** - Full working examples, color palettes, common patterns (title card, slide deck, kinetic typography)
+## Quick Start — JSON Mode
+1. Call **rule_scene_format** + **rule_animations**
+2. Call **create_composition** with scenes array
 
-## Quick Start
-
-1. Call **rule_scene_format** to understand the scene structure
-2. Call **rule_animations** to learn animation options
-3. Call **create_composition** with your scenes
+## Quick Start — Code Mode
+1. Call **rule_react_code** for the API reference
+2. Call **create_video** with React component code
 
 ## Important Rules
-
-1. Every scene MUST have a unique "id" string
-2. Every element MUST have a unique "id" string
-3. durationInFrames must be a positive integer
-4. x, y positions are percentages (0-100), center = 50, 50
-5. width, height for elements are percentages of canvas
-6. fontSize is in pixels
-7. DO NOT use CSS transitions or animations - only frame-based animations
-8. Transition durations overlap scenes (subtracted from total)
-9. Keep scenes focused - 2-5 elements per scene works best
-10. Use \\n for newlines in text content, never literal line breaks inside JSON strings
-11. Transition directions must be "from-left", "from-right", "from-top", "from-bottom"
+1. Every scene needs unique "id", durationInFrames, background (JSON mode)
+2. DO NOT use CSS transitions/animations — only Remotion frame-based animations
+3. Use \\n for newlines in text, never literal line breaks inside JSON strings
+4. Transition directions: "from-left", "from-right", "from-top", "from-bottom"
+5. Code mode: use React.createElement, NOT JSX
 `;
