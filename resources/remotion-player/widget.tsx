@@ -36,7 +36,7 @@ class PlayerErrorBoundary extends Component<
   }
 }
 
-const VERSION = "0.2.1";
+const VERSION = "0.2.2";
 
 const propSchema = z.object({
   composition: z.string().optional().describe("JSON composition (JSON mode)"),
@@ -195,15 +195,11 @@ export default function RemotionPlayerWidget() {
     : (comp?.scenes ? calcDuration(comp.scenes) : 1);
   const hasData = isCodeMode ? !!codeData : !!comp;
 
-  const download = useCallback(() => {
-    const data = isCodeMode ? codeData : comp;
-    if (!data) return;
-    const json = JSON.stringify(data, null, 2);
-    const a = document.createElement("a");
-    a.href = "data:application/json;charset=utf-8," + encodeURIComponent(json);
-    a.download = `${(data as any).meta?.title || "video"}.json`;
-    a.click();
-  }, [isCodeMode, codeData, comp]);
+  const toggleFullscreen = useCallback(() => {
+    const next = !isFullscreen;
+    setIsFullscreen(next);
+    try { appRef.current?.requestDisplayMode?.({ mode: next ? "fullscreen" : "inline" }); } catch {}
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (!activeMeta || isFullscreen) return;
@@ -228,11 +224,7 @@ export default function RemotionPlayerWidget() {
   }
 
   const title = activeMeta?.title || "Untitled";
-  const info = activeMeta
-    ? `${activeMeta.width}x${activeMeta.height} · ${activeMeta.fps}fps · ${(activeDur / activeMeta.fps).toFixed(1)}s`
-    : "";
 
-  // Build the Player element (reused in both inline and fullscreen)
   const playerEl = (
     <PlayerErrorBoundary appRef={appRef} dark={dark}>
       <Player
@@ -252,20 +244,23 @@ export default function RemotionPlayerWidget() {
     </PlayerErrorBoundary>
   );
 
+  const fsIcon = isFullscreen
+    ? <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 2 6 6 2 6"/><polyline points="10 14 10 10 14 10"/><line x1="2" y1="2" x2="6" y2="6"/><line x1="14" y1="14" x2="10" y2="10"/></svg>
+    : <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="10 2 14 2 14 6"/><polyline points="6 14 2 14 2 10"/><line x1="14" y1="2" x2="10" y2="6"/><line x1="2" y1="14" x2="6" y2="10"/></svg>;
+
+  const header = (
+    <div style={{ padding: "6px 10px 6px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+      <span style={{ color: fg, fontSize: 13, fontWeight: 500 }}>{title}</span>
+      <button onClick={toggleFullscreen} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"} style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex", alignItems: "center", justifyContent: "center", color: fg2, borderRadius: 4, opacity: 0.7 }}>
+        {fsIcon}
+      </button>
+    </div>
+  );
+
   if (isFullscreen) {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#000", fontFamily: "system-ui, sans-serif" }}>
-        <div style={{ padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", background: bg2, borderBottom: `1px solid ${bd}`, flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: fg, fontSize: 13, fontWeight: 500 }}>{title}</span>
-            <span style={{ color: fg2, fontSize: 9, opacity: 0.5 }}>v{VERSION}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: fg2 }}>
-            <span>{info}</span>
-            <button onClick={download} style={{ padding: "3px 10px", fontSize: 11, fontWeight: 500, border: `1px solid ${bd}`, borderRadius: 4, cursor: "pointer", background: "transparent", color: fg, fontFamily: "inherit" }}>Download</button>
-            <button onClick={() => { setIsFullscreen(false); try { appRef.current?.requestDisplayMode?.({ mode: "inline" }); } catch {} }} style={{ padding: "3px 10px", fontSize: 11, fontWeight: 500, border: `1px solid ${bd}`, borderRadius: 4, cursor: "pointer", background: "transparent", color: fg, fontFamily: "inherit" }}>Close</button>
-          </div>
-        </div>
+        {header}
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>{playerEl}</div>
       </div>
     );
@@ -273,17 +268,7 @@ export default function RemotionPlayerWidget() {
 
   return (
     <div ref={containerRef} style={{ borderRadius: 8, overflow: "hidden", background: bg, fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", background: bg2, borderBottom: `1px solid ${bd}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: fg, fontSize: 13, fontWeight: 500 }}>{title}</span>
-          <span style={{ color: fg2, fontSize: 9, opacity: 0.5 }}>v{VERSION}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: fg2 }}>
-          {!isStreaming && <span>{info}</span>}
-          {!isStreaming && <button onClick={download} style={{ padding: "3px 10px", fontSize: 11, fontWeight: 500, border: `1px solid ${bd}`, borderRadius: 4, cursor: "pointer", background: "transparent", color: fg, fontFamily: "inherit" }}>Download</button>}
-          {!isStreaming && <button onClick={() => { setIsFullscreen(true); try { appRef.current?.requestDisplayMode?.({ mode: "fullscreen" }); } catch {} }} style={{ padding: "3px 10px", fontSize: 11, fontWeight: 500, border: `1px solid ${bd}`, borderRadius: 4, cursor: "pointer", background: "transparent", color: fg, fontFamily: "inherit" }}>Edit</button>}
-        </div>
-      </div>
+      {header}
       {playerEl}
     </div>
   );
