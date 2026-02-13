@@ -4,13 +4,21 @@ Create videos using React component code with full Remotion API access.
 
 ## Available Rules
 
-- **rule_react_code** - React.createElement API reference, all available Remotion imports, code examples
-- **rule_timing** - FPS guide, duration in frames, animation timing patterns
+Call these tools to learn specific Remotion topics:
+
+- **rule_react_code** - React.createElement API, available imports, code structure
+- **rule_remotion_animations** - useCurrentFrame, frame-driven animations
+- **rule_remotion_timing** - interpolate, spring, Easing, spring configs
+- **rule_remotion_sequencing** - Sequence, delay, nested timing
+- **rule_remotion_transitions** - TransitionSeries, fade, slide, wipe, flip
+- **rule_remotion_text_animations** - Typewriter effect, word highlighting
+- **rule_remotion_trimming** - Trim start/end of animations with Sequence
 
 ## Quick Start
 
-1. Call **rule_react_code** for the API reference
-2. Call **create_video** with your React component code
+1. Call **rule_react_code** for the code API reference
+2. Call any specific rule for the topic you need
+3. Call **create_video** with your React component code
 
 ## Important Rules
 
