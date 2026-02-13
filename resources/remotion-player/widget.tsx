@@ -36,7 +36,7 @@ class PlayerErrorBoundary extends Component<
   }
 }
 
-const VERSION = "0.2.0";
+const VERSION = "0.2.1";
 
 const propSchema = z.object({
   composition: z.string().optional().describe("JSON composition (JSON mode)"),
@@ -96,6 +96,22 @@ function buildComposition(input: Record<string, unknown> | null): CompositionDat
   return { meta: { title: (input.title as string) || "Untitled", width: (input.width as number) || 1920, height: (input.height as number) || 1080, fps: (input.fps as number) || 30 }, scenes };
 }
 
+// --- Persist last video across widget instances ---
+const PREV_KEY = "remotion-mcp-prev";
+function savePrev(data: CompositionData | VideoCodeData) {
+  try { localStorage.setItem(PREV_KEY, JSON.stringify(data)); } catch {}
+}
+function loadPrev(): { comp?: CompositionData; code?: VideoCodeData } | null {
+  try {
+    const raw = localStorage.getItem(PREV_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.code && parsed.meta?.durationInFrames) return { code: parsed };
+    if (parsed.scenes) return { comp: parsed };
+  } catch {}
+  return null;
+}
+
 // --- Code mode helpers ---
 
 function buildVideoCode(input: Record<string, unknown> | null): VideoCodeData | null {
@@ -152,16 +168,19 @@ export default function RemotionPlayerWidget() {
     },
   });
 
+  // Load previous video from localStorage (survives across widget instances)
+  const [prev] = useState(() => loadPrev());
+
   // JSON mode state
   const streamingComp = useMemo(() => (!isFinal ? buildComposition(toolInput) : null), [isFinal, toolInput]);
   const finalComp = useMemo(() => resultComp || (isFinal ? buildComposition(toolInput) : null), [resultComp, isFinal, toolInput]);
-  const prevCompRef = useRef<CompositionData | null>(null);
-  useEffect(() => { if (finalComp) prevCompRef.current = finalComp; }, [finalComp]);
+  const prevCompRef = useRef<CompositionData | null>(prev?.comp || null);
+  useEffect(() => { if (finalComp) { prevCompRef.current = finalComp; savePrev(finalComp); } }, [finalComp]);
 
   // Code mode state
   const finalCode = useMemo(() => resultCode || (isFinal ? buildVideoCode(toolInput) : null), [resultCode, isFinal, toolInput]);
-  const prevCodeRef = useRef<VideoCodeData | null>(null);
-  useEffect(() => { if (finalCode) prevCodeRef.current = finalCode; }, [finalCode]);
+  const prevCodeRef = useRef<VideoCodeData | null>(prev?.code || null);
+  useEffect(() => { if (finalCode) { prevCodeRef.current = finalCode; savePrev(finalCode); } }, [finalCode]);
 
   // Determine active mode and data
   const isCodeMode = !!(finalCode || prevCodeRef.current || buildVideoCode(toolInput));
