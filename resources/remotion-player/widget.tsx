@@ -119,13 +119,18 @@ function buildVideoCode(input: Record<string, unknown> | null): VideoCodeData | 
   // From videoCode prop (server sends JSON string)
   const raw = input.videoCode;
   if (raw && typeof raw === "string") {
-    try { const p = JSON.parse(raw); if (p.meta && p.code) return p; } catch {}
+    try {
+      const p = JSON.parse(raw);
+      if (p.meta && p.code && p.code.trim() && p.meta.durationInFrames > 0) return p;
+    } catch {}
   }
   // From direct tool input (code field)
-  if (input.code && typeof input.code === "string" && input.durationInFrames) {
+  const code = input.code;
+  const dur = input.durationInFrames;
+  if (code && typeof code === "string" && code.trim() && dur && (dur as number) > 0) {
     return {
-      meta: { title: (input.title as string) || "Untitled", width: (input.width as number) || 1920, height: (input.height as number) || 1080, fps: (input.fps as number) || 30, durationInFrames: input.durationInFrames as number },
-      code: input.code as string,
+      meta: { title: (input.title as string) || "Untitled", width: (input.width as number) || 1920, height: (input.height as number) || 1080, fps: (input.fps as number) || 30, durationInFrames: dur as number },
+      code: code as string,
     };
   }
   return null;

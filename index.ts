@@ -213,7 +213,10 @@ server.tool(
     const { title, width, height, fps, durationInFrames, code } = params;
 
     if (!code || code.trim().length === 0) {
-      return text("Error: code must be a non-empty string.");
+      return text("Error: code must be a non-empty string containing a React component body.");
+    }
+    if (!durationInFrames || durationInFrames <= 0) {
+      return text("Error: durationInFrames must be a positive number (e.g. 150 = 5s at 30fps).");
     }
 
     const videoData = JSON.stringify({
