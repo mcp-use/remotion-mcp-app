@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback, Component, type ErrorInfo, type ReactNode } from "react";
 import { z } from "zod";
 import type { WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider } from "mcp-use/react";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { Player, type PlayerRef } from "@remotion/player";
 import { CodeComposition } from "./components/CodeComposition";
@@ -91,7 +92,15 @@ function parseVideoCode(input: Record<string, unknown> | null): VideoCodeData | 
   return null;
 }
 
-export default function RemotionPlayerWidget() {
+export default function RemotionPlayerWidgetWrapper() {
+  return (
+    <McpUseProvider autoSize>
+      <RemotionPlayerWidget />
+    </McpUseProvider>
+  );
+}
+
+function RemotionPlayerWidget() {
   const [toolInput, setToolInput] = useState<Record<string, unknown> | null>(null);
   const [isFinal, setIsFinal] = useState(false);
   const [result, setResult] = useState<VideoCodeData | null>(null);
@@ -134,12 +143,8 @@ export default function RemotionPlayerWidget() {
     try { appRef.current?.requestDisplayMode?.({ mode: next ? "fullscreen" : "inline" }); } catch {}
   }, [isFullscreen]);
 
-  useEffect(() => {
-    if (!data || isFullscreen) return;
-    const aspect = data.meta.height / data.meta.width;
-    const w = containerRef.current?.offsetWidth || 600;
-    try { appRef.current?.notifyIntrinsicHeight?.(Math.round(w * aspect) + 30); } catch {}
-  }, [data, isFullscreen]);
+  // Height auto-sizing is handled by McpUseProvider's autoSize prop
+  // which uses ResizeObserver + bridge.sendSizeChanged().
 
   const dark = theme === "dark";
   const bg = dark ? "#141414" : "#fff";
