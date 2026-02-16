@@ -572,7 +572,14 @@ export default function RemotionPlayerWidget() {
           </div>
         </div>
       ) : (
-        <div style={{ position: "relative" }}>
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            maxWidth: isFullscreen ? "100%" : undefined,
+            margin: isFullscreen ? "0 auto" : undefined,
+          }}
+        >
           <Player
             ref={ref}
             component={compiledProject?.component as any}
@@ -584,7 +591,12 @@ export default function RemotionPlayerWidget() {
             controls
             autoPlay
             loop
-            style={{ width: "100%", maxHeight: isFullscreen ? "100%" : undefined }}
+            style={{
+              width: "100%",
+              maxWidth: "100%",
+              maxHeight: isFullscreen ? "calc(100vh - 56px)" : undefined,
+              margin: "0 auto",
+            }}
           />
           {(isPending || isStreaming) ? (
             <div
@@ -622,8 +634,18 @@ export default function RemotionPlayerWidget() {
           }}
         >
           {header}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {playerEl}
+          <div
+            style={{
+              flex: 1,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "12px 16px 16px",
+              boxSizing: "border-box",
+            }}
+          >
+            <div style={{ width: "100%", maxWidth: 1680 }}>{playerEl}</div>
           </div>
         </div>
       </McpUseProvider>
