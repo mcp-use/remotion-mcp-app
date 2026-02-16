@@ -18,13 +18,13 @@
     "build": "NODE_OPTIONS='--max-old-space-size=8192' mcp-use build",
     "dev": "mcp-use dev",
     "start": "mcp-use start",
-    "deploy": "mcp-use deploy"
+    "deploy": "mcp-use deploy",
+    "smoke:create-video": "node scripts/smoke-create-video.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@remotion/player": "4.0.268",
     "@remotion/transitions": "4.0.268",
-    "mcp-use": "latest",
+    "mcp-use": "^1.18.0",
     "node-mocks-http": "^1.17.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

@@ -2,23 +2,23 @@ export const RULE_REMOTION_TIMING = `# Remotion Timing — interpolate, spring, 
 
 ## interpolate
 Maps a value from one range to another.
-\`\`\`
-var opacity = interpolate(frame, [0, 100], [0, 1]);
+\`\`\`jsx
+const opacity = interpolate(frame, [0, 100], [0, 1]);
 \`\`\`
 
 Clamping (recommended):
-\`\`\`
-var opacity = interpolate(frame, [0, 100], [0, 1], {
+\`\`\`jsx
+const opacity = interpolate(frame, [0, 100], [0, 1], {
   extrapolateRight: "clamp", extrapolateLeft: "clamp",
 });
 \`\`\`
 
 ## spring
 Physics-based animation. Goes from 0 to 1 with natural motion.
-\`\`\`
-var frame = useCurrentFrame();
-var { fps } = useVideoConfig();
-var scale = spring({ frame: frame, fps: fps });
+\`\`\`jsx
+const frame = useCurrentFrame();
+const { fps } = useVideoConfig();
+const scale = spring({ frame, fps });
 \`\`\`
 
 ### Spring configs
@@ -29,33 +29,33 @@ var scale = spring({ frame: frame, fps: fps });
 - Heavy: { damping: 15, stiffness: 80, mass: 2 }
 
 ### Delay
-\`\`\`
-var entrance = spring({ frame: frame, fps: fps, delay: 20 });
+\`\`\`jsx
+const entrance = spring({ frame, fps, delay: 20 });
 \`\`\`
 
 ### Fixed duration
-\`\`\`
-var s = spring({ frame: frame, fps: fps, durationInFrames: 40 });
+\`\`\`jsx
+const s = spring({ frame, fps, durationInFrames: 40 });
 \`\`\`
 
 ### Combining spring with interpolate
-\`\`\`
-var progress = spring({ frame: frame, fps: fps });
-var rotation = interpolate(progress, [0, 1], [0, 360]);
+\`\`\`jsx
+const progress = spring({ frame, fps });
+const rotation = interpolate(progress, [0, 1], [0, 360]);
 \`\`\`
 
 ### Enter + exit
-\`\`\`
-var frame = useCurrentFrame();
-var { fps, durationInFrames } = useVideoConfig();
-var enter = spring({ frame: frame, fps: fps });
-var exit = spring({ frame: frame, fps: fps, delay: durationInFrames - fps, durationInFrames: fps });
-var scale = enter - exit;
+\`\`\`jsx
+const frame = useCurrentFrame();
+const { fps, durationInFrames } = useVideoConfig();
+const enter = spring({ frame, fps });
+const exit = spring({ frame, fps, delay: durationInFrames - fps, durationInFrames: fps });
+const scale = enter - exit;
 \`\`\`
 
 ## Easing
-\`\`\`
-var value = interpolate(frame, [0, 100], [0, 1], {
+\`\`\`jsx
+const value = interpolate(frame, [0, 100], [0, 1], {
   easing: Easing.inOut(Easing.quad), extrapolateLeft: "clamp", extrapolateRight: "clamp",
 });
 \`\`\`

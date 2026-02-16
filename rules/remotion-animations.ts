@@ -4,12 +4,16 @@ All animations MUST be driven by useCurrentFrame().
 CSS transitions and CSS animations are FORBIDDEN — they will not render correctly.
 
 ## Basic fade in
-\`\`\`
-var frame = useCurrentFrame();
-var { fps } = useVideoConfig();
-var opacity = interpolate(frame, [0, 2 * fps], [0, 1], { extrapolateRight: "clamp" });
+\`\`\`jsx
+const frame = useCurrentFrame();
+const { fps } = useVideoConfig();
+const opacity = interpolate(frame, [0, 2 * fps], [0, 1], { extrapolateRight: "clamp" });
 
-return React.createElement("div", { style: { opacity: opacity } }, "Hello World!");
+return (
+  <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
+    <div style={{ opacity, color: "#fff", fontSize: 64 }}>Hello World!</div>
+  </AbsoluteFill>
+);
 \`\`\`
 
 ## Key principles

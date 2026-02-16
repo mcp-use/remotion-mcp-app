@@ -1,48 +1,89 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import {
-  useCurrentFrame, useVideoConfig, interpolate, spring,
-  AbsoluteFill, Sequence, Img, Easing,
-} from "remotion";
-import { TransitionSeries, linearTiming, springTiming } from "@remotion/transitions";
-import { fade } from "@remotion/transitions/fade";
-import { slide } from "@remotion/transitions/slide";
-import { wipe } from "@remotion/transitions/wipe";
-import { flip } from "@remotion/transitions/flip";
+import React, { useMemo } from "react";
+import * as ReactModule from "react";
+import * as ReactJsxRuntimeModule from "react/jsx-runtime";
+import * as ReactJsxDevRuntimeModule from "react/jsx-dev-runtime";
+import * as RemotionModule from "remotion";
+import { RUNTIME_BUNDLE_GLOBAL, RUNTIME_PACKAGE_GLOBAL } from "../../../types";
 
-const PARAM_NAMES = [
-  "React", "useState", "useMemo", "useEffect", "useCallback", "useRef",
-  "useCurrentFrame", "useVideoConfig", "interpolate", "spring", "Easing",
-  "AbsoluteFill", "Sequence", "Img",
-  "TransitionSeries", "linearTiming", "springTiming",
-  "fade", "slide", "wipe", "flip",
-];
+export type RuntimeMetadataInput = {
+  props: Record<string, unknown>;
+  defaultProps: Record<string, unknown>;
+  compositionId: string;
+  abortSignal?: AbortSignal;
+};
 
-const PARAM_VALUES = [
-  React, useState, useMemo, useEffect, useCallback, useRef,
-  useCurrentFrame, useVideoConfig, interpolate, spring, Easing,
-  AbsoluteFill, Sequence, Img,
-  TransitionSeries, linearTiming, springTiming,
-  fade, slide, wipe, flip,
-];
+export type CompiledBundle = {
+  component: React.ComponentType<Record<string, unknown>>;
+  calculateMetadata?: (input: RuntimeMetadataInput) => unknown | Promise<unknown>;
+};
 
-function compileCode(code: string): React.FC | { error: string } {
+const runtimePackages: Record<string, Record<string, unknown>> = {
+  react: ReactModule as Record<string, unknown>,
+  "react/jsx-runtime": ReactJsxRuntimeModule as Record<string, unknown>,
+  "react/jsx-dev-runtime": ReactJsxDevRuntimeModule as Record<string, unknown>,
+  remotion: RemotionModule as Record<string, unknown>,
+};
+
+function ensureRuntimePackages(): void {
+  const root = globalThis as Record<string, unknown>;
+  const existing = root[RUNTIME_PACKAGE_GLOBAL];
+
+  if (existing && typeof existing === "object") {
+    Object.assign(existing as Record<string, unknown>, runtimePackages);
+    return;
+  }
+
+  root[RUNTIME_PACKAGE_GLOBAL] = runtimePackages;
+}
+
+ensureRuntimePackages();
+
+type RuntimeExports = {
+  default?: unknown;
+  calculateMetadata?: unknown;
+};
+
+export function compileBundle(bundleCode: string): CompiledBundle | { error: string } {
   try {
-    const factory = new Function(...PARAM_NAMES, code);
-    const Component: React.FC = () => factory(...PARAM_VALUES);
-    Component.displayName = "CodeComponent";
-    return Component;
-  } catch (e) {
-    return { error: `Compilation error: ${(e as Error).message}` };
+    const evaluator = new Function(
+      `${bundleCode}\nreturn typeof ${RUNTIME_BUNDLE_GLOBAL} !== \"undefined\" ? ${RUNTIME_BUNDLE_GLOBAL} : null;`
+    );
+
+    const exports = evaluator() as RuntimeExports | null;
+
+    if (!exports || typeof exports !== "object") {
+      return { error: "Compilation error: bundle did not return exports." };
+    }
+
+    if (typeof exports.default !== "function") {
+      return {
+        error:
+          "Compilation error: entry module must export a default React component (export default function ...).",
+      };
+    }
+
+    return {
+      component: exports.default as React.ComponentType<Record<string, unknown>>,
+      calculateMetadata:
+        typeof exports.calculateMetadata === "function"
+          ? (exports.calculateMetadata as (input: RuntimeMetadataInput) => unknown | Promise<unknown>)
+          : undefined,
+    };
+  } catch (error) {
+    return { error: `Compilation error: ${(error as Error).message}` };
   }
 }
 
-export const CodeComposition: React.FC<{ code: string }> = ({ code }) => {
-  const compiled = useMemo(() => compileCode(code), [code]);
+export const CodeComposition: React.FC<{
+  bundle: string;
+  componentProps: Record<string, unknown>;
+}> = ({ bundle, componentProps }) => {
+  const compiled = useMemo(() => compileBundle(bundle), [bundle]);
 
   if ("error" in compiled) {
     throw new Error(compiled.error);
   }
 
-  const Component = compiled;
-  return <Component />;
+  const Component = compiled.component;
+  return <Component {...componentProps} />;
 };
