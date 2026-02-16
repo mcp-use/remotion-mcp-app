@@ -11,6 +11,7 @@ import React, {
 import { z } from "zod";
 import { useWidget, McpUseProvider, type WidgetMetadata } from "mcp-use/react";
 import { Player, type PlayerRef } from "@remotion/player";
+import { GrainGradient } from "@paper-design/shaders-react";
 import { compileBundle } from "./components/CodeComposition";
 import type { VideoMeta, VideoProjectData } from "../../types";
 
@@ -273,7 +274,7 @@ export default function RemotionPlayerWidget() {
 
         try {
           sendFollowUpMessage(
-            `calculateMetadata() failed:\n\n\`${(error as Error).message}\`\n\nPlease fix the project and call create_video again.`
+            `calculateMetadata() failed:\n\n\`${(error as Error).message}\`\n\nPlease fix the project and call create_video or update_video again.`
           );
         } catch {
           // Ignore follow-up failures.
@@ -293,7 +294,7 @@ export default function RemotionPlayerWidget() {
 
     try {
       sendFollowUpMessage(
-        `The project had a compilation error:\n\n\`${compileError}\`\n\nPlease fix the files and call create_video again.`
+        `The project had a compilation error:\n\n\`${compileError}\`\n\nPlease fix the files and call create_video or update_video again.`
       );
     } catch {
       // Ignore follow-up failures.
@@ -314,7 +315,7 @@ export default function RemotionPlayerWidget() {
     (msg: string) => {
       try {
         sendFollowUpMessage(
-          `The video had a runtime error:\n\n\`${msg}\`\n\nPlease fix the project and call create_video again.`
+          `The video had a runtime error:\n\n\`${msg}\`\n\nPlease fix the project and call create_video or update_video again.`
         );
       } catch {
         // Ignore follow-up failures.
@@ -329,13 +330,62 @@ export default function RemotionPlayerWidget() {
   const fg2 = dark ? "#777" : "#888";
 
   if (!hasData) {
+    const isLoading = isPending || isStreaming;
     const title = (streamingInput?.title as string | undefined) || (toolInput as any)?.title;
     const statusText =
-      isPending || isStreaming
+      isLoading
         ? title
           ? `Creating "${title}"...`
           : "Creating..."
-        : "No video project data was returned. Check the tool output and call create_video again.";
+        : "No video project data was returned. Check the tool output and call create_video or update_video again.";
+
+    if (isLoading) {
+      return (
+        <McpUseProvider autoSize>
+          <div
+            style={{
+              position: "relative",
+              minHeight: 260,
+              borderRadius: 8,
+              overflow: "hidden",
+              fontFamily: "system-ui, sans-serif",
+            }}
+          >
+            <GrainGradient
+              width="100%"
+              height={260}
+              colors={["#7300ff", "#eba8ff", "#00bfff", "#2b00ff", "#33cc99", "#3399cc", "#3333cc"]}
+              colorBack={dark ? "#000000" : "#ffffff"}
+              softness={1}
+              intensity={1}
+              noise={0.0}
+              shape="corners"
+              speed={2}
+              scale={1.8}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+            />
+            <div
+              style={{
+                position: "relative",
+                zIndex: 1,
+                minHeight: 260,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                color: "#22344a",
+                textAlign: "center",
+                padding: 20,
+                textShadow: "0 1px 2px rgba(255,255,255,0.35)",
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 500 }}>{statusText}</div>
+            </div>
+          </div>
+        </McpUseProvider>
+      );
+    }
 
     return (
       <McpUseProvider autoSize>

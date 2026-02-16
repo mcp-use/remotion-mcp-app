@@ -22,6 +22,7 @@
     "smoke:create-video": "node scripts/smoke-create-video.mjs"
   },
   "dependencies": {
+    "@paper-design/shaders-react": "^0.0.71",
     "@remotion/player": "4.0.268",
     "@remotion/transitions": "4.0.268",
     "mcp-use": "^1.18.0",
