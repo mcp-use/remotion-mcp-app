@@ -205,7 +205,7 @@ function useLoadingWord(active: boolean) {
     }
     const rotateMs = 2500;
     const fadeMs = 220;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
+    let timeout: number | null = null;
     const interval = window.setInterval(() => {
       setVisible(false);
       timeout = window.setTimeout(() => {
