@@ -12,13 +12,27 @@ Unlike a standard MCP server that only returns text, an **MCP App** bundles a fu
 
 ## Try it now
 
-Connect any MCP-compatible client to the hosted instance:
+Connect to the hosted instance:
 
 ```
 https://still-feather-l5mwy.run.mcp-use.com/mcp
 ```
 
-Works with ChatGPT, Claude, or any client that supports [MCP Apps](https://mcp-use.com).
+### Setup on ChatGPT
+
+1. Open **Settings** > **Apps and Connectors** > **Advanced Settings** and enable **Developer Mode**
+2. Go to **Connectors** > **Create**, name it "Remotion", paste the URL above
+3. In a new chat, click **+** > **More** and select the Remotion connector
+
+> Requires ChatGPT Pro, Team, Enterprise, or Edu. [Full guide](https://developers.openai.com/apps-sdk/deploy/connect-chatgpt/)
+
+### Setup on Claude
+
+1. Open **Settings** > **Connectors** > **Add custom connector**
+2. Paste the URL above and save
+3. The Remotion tools will be available in new conversations
+
+> Requires Claude Pro, Max, Team, or Enterprise. [Full guide](https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp)
 
 ## Demos
 
