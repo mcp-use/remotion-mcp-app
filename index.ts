@@ -21,6 +21,7 @@ const server = new MCPServer({
   name: "remotion-mcp",
   title: "Remotion Video Creator",
   version: "2.0.0",
+  host: "0.0.0.0",
   description:
     "Create Remotion videos from multi-file React projects with props-first composition design.",
 });
