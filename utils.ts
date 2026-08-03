@@ -1,4 +1,3 @@
-import { text, widget } from "mcp-use/server";
 import { z } from "zod";
 import { build, type Loader, type Plugin } from "esbuild";
 import path from "node:path";
@@ -437,10 +436,10 @@ export function failProject(
     inputProps: fallbackProps?.inputProps,
   });
 
-  return widget({
-    props: { videoProject: JSON.stringify(errorProject) },
-    output: text(`Project error: ${message}`),
-  });
+  return {
+    content: [{ type: "text" as const, text: `Project error: ${message}` }],
+    structuredContent: { videoProject: JSON.stringify(errorProject) },
+  };
 }
 
 export function getSessionProject(sessionId: string): SessionProjectState | null {
@@ -510,10 +509,12 @@ export async function compileAndRespondWithProject(
     inputProps,
   });
 
-  return widget({
-    props: { videoProject: JSON.stringify(projectData) },
-    output: text(
-      [
+  return {
+    structuredContent: { videoProject: JSON.stringify(projectData) },
+    content: [
+      {
+        type: "text" as const,
+        text: [
         ...statusPrefixLines,
         `Created video project \"${title}\".`,
         `Entry: ${entryFile} (${Object.keys(files).length} files).`,
@@ -522,9 +523,10 @@ export async function compileAndRespondWithProject(
         ).toFixed(1)}s).`,
         "The player is using merged props (defaultProps + inputProps).",
         `To iterate: update files, props, or metadata and call ${iterateToolName} again.`,
-      ]
-        .filter((line) => line.trim().length > 0)
-        .join("\n")
-    ),
-  });
+        ]
+          .filter((line) => line.trim().length > 0)
+          .join("\n"),
+      },
+    ],
+  };
 }

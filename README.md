@@ -6,9 +6,9 @@
 
 # Remotion MCP App
 
-An [MCP App](https://mcp-use.com) for AI-powered video creation. It combines an MCP server with an interactive widget — the model writes React/[Remotion](https://remotion.dev) code, the server compiles it in real-time, and a live video player renders the result directly inside the chat.
+An [MCP App](https://mcp-use.com) for AI-powered video creation. It combines an MCP server with an interactive View — the model writes React/[Remotion](https://remotion.dev) code, the server compiles it in real-time, and a live video player renders the result directly inside the chat.
 
-Unlike a standard MCP server that only returns text, an **MCP App** bundles a full UI widget alongside its tools. The Remotion Player widget renders inline in any compatible client (ChatGPT, Claude, or custom apps built with [mcp-use](https://mcp-use.com)), giving the model a visual canvas it can iterate on.
+Unlike a standard MCP server that only returns text, an **MCP App** bundles a full UI View alongside its tools. The Remotion Player View renders inline in any compatible client (ChatGPT, Claude, or custom apps built with [mcp-use](https://mcp-use.com)), giving the model a visual canvas it can iterate on.
 
 ## Try it now
 
@@ -48,29 +48,29 @@ https://still-feather-l5mwy.run.mcp-use.com/mcp
 
 ## How it works
 
-This is an **MCP App** — an MCP server paired with a UI widget. The two pieces work together:
+This is an **MCP App** — an MCP server paired with a UI View. The two pieces work together:
 
 1. **MCP Server** -- exposes `create_video` tool + rule tools for teaching Remotion patterns
-2. **Widget** -- a Remotion Player that renders inline in the chat, receives compiled bundles from the server
+2. **View** -- a Remotion Player that renders inline in the chat and receives compiled bundles from the server
 
 The flow:
 
 1. The model calls `create_video` with React/Remotion source files
 2. The server compiles the project with esbuild (sub-second)
-3. The compiled bundle is sent back as `structuredContent`, and the widget renders it as a playable video
-4. For edits, the model calls `create_video` again with only changed files -- the widget updates in-place with a loading overlay
+3. The compiled bundle is sent back as `structuredContent`, and the View renders it as a playable video
+4. For edits, the model calls `create_video` again with only changed files -- the View renders the updated video
 
 ```
-Model                    MCP App (Server + Widget)
+Model                     MCP App (Server + View)
   |                          |
   |-- create_video({files}) ->|
   |                          |-- esbuild compile
   |<- structuredContent -----|
-  |                          |-- Widget renders video inline
+  |                          |-- View renders video inline
   |                          |
   |-- create_video({edits}) ->|
   |                          |-- merge + recompile
-  |                          |-- Widget updates in-place
+  |                          |-- View renders the updated result
 ```
 
 ### Single tool design
@@ -91,9 +91,9 @@ The server includes teaching tools derived from the [remotion-best-practices](ht
 | `rule_remotion_text_animations` | Typewriter effect, word highlighting |
 | `rule_remotion_trimming` | Trimming with negative `Sequence` from |
 
-### Widget (the "App" part)
+### View (the "App" part)
 
-The Remotion Player widget is what makes this an MCP App rather than a plain MCP server. It runs inside the chat interface and features:
+The Remotion Player View is what makes this an MCP App rather than a plain MCP server. It runs inside the chat interface and features:
 
 - Live video playback with controls
 - Animated loading state with shader gradient while the model writes code
@@ -105,7 +105,7 @@ The Remotion Player widget is what makes this an MCP App rather than a plain MCP
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22.22.2+
 - npm or pnpm
 
 ### Setup
@@ -147,8 +147,9 @@ index.ts                     -- MCP server, tool definitions, handler
 utils.ts                     -- esbuild compilation, session state, response helpers
 types.ts                     -- Shared types (VideoProjectData, VideoMeta)
 rules/                       -- Remotion teaching content served by rule tools
-resources/remotion-player/   -- Widget source (React + Remotion Player)
-  widget.tsx                 -- Main widget component
+views/remotion-player/       -- MCP App View (React + Remotion Player)
+  view.tsx                   -- Main View component
+  types.ts                   -- Browser-only View types and runtime constants
   components/
     CodeComposition.tsx      -- Bundle compiler (eval + runtime shim)
 ```
@@ -177,7 +178,7 @@ The `files` parameter is a JSON string mapping virtual file paths to source code
 
 ## Session behavior
 
-- Each MCP session maintains its own project state
+- ChatGPT conversations maintain isolated project state; other clients fall back to caller or transport identity
 - Calling `create_video` merges new files with the previous project
 - Metadata (title, fps, dimensions) carries forward unless overridden
 - Sessions are capped at 250 concurrent projects with LRU eviction

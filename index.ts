@@ -1,5 +1,6 @@
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
+import { observeMcpToolCall, posthog } from "./observability.js";
 import { RULE_INDEX } from "./rules/index.js";
 import { RULE_REACT_CODE } from "./rules/react-code.js";
 import { RULE_REMOTION_ANIMATIONS } from "./rules/remotion-animations.js";
@@ -16,58 +17,63 @@ import {
   getSessionProject,
 } from "./utils.js";
 
-const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-
 const server = new MCPServer({
   name: "remotion-mcp",
   title: "Remotion Video Creator",
   version: "2.0.0",
   description:
     "Create Remotion videos from multi-file React projects with props-first composition design.",
-  host: process.env.HOST ?? "0.0.0.0",
-  baseUrl: process.env.MCP_URL ?? `http://localhost:${port}`,
+});
+
+if (posthog) {
+  server.use("mcp:tools/call", observeMcpToolCall);
+}
+
+process.on("SIGTERM", async () => {
+  if (posthog) await posthog.shutdown();
+  process.exit(0);
 });
 
 // --- Rule tools ---
 
-server.tool(
+export const readMe = server.tool(
   { name: "read_me", description: "IMPORTANT: Call this FIRST. Returns the guide overview and lists all available rule tools." },
-  async () => text(RULE_INDEX)
+  async () => ({ content: [{ type: "text", text: RULE_INDEX }] })
 );
 
-server.tool(
+export const ruleReactCode = server.tool(
   { name: "rule_react_code", description: "Project code reference: file structure, supported imports, component/props patterns" },
-  async () => text(RULE_REACT_CODE)
+  async () => ({ content: [{ type: "text", text: RULE_REACT_CODE }] })
 );
 
-server.tool(
+export const ruleRemotionAnimations = server.tool(
   { name: "rule_remotion_animations", description: "Remotion animations: useCurrentFrame, frame-driven animation fundamentals" },
-  async () => text(RULE_REMOTION_ANIMATIONS)
+  async () => ({ content: [{ type: "text", text: RULE_REMOTION_ANIMATIONS }] })
 );
 
-server.tool(
+export const ruleRemotionTiming = server.tool(
   { name: "rule_remotion_timing", description: "Remotion timing: interpolate, spring, Easing, spring configs, delay, duration" },
-  async () => text(RULE_REMOTION_TIMING)
+  async () => ({ content: [{ type: "text", text: RULE_REMOTION_TIMING }] })
 );
 
-server.tool(
+export const ruleRemotionSequencing = server.tool(
   { name: "rule_remotion_sequencing", description: "Remotion sequencing: Sequence, delay, nested timing, local frames" },
-  async () => text(RULE_REMOTION_SEQUENCING)
+  async () => ({ content: [{ type: "text", text: RULE_REMOTION_SEQUENCING }] })
 );
 
-server.tool(
+export const ruleRemotionTransitions = server.tool(
   { name: "rule_remotion_transitions", description: "Remotion transitions: TransitionSeries, fade, slide, wipe, flip, duration calculation" },
-  async () => text(RULE_REMOTION_TRANSITIONS)
+  async () => ({ content: [{ type: "text", text: RULE_REMOTION_TRANSITIONS }] })
 );
 
-server.tool(
+export const ruleRemotionTextAnimations = server.tool(
   { name: "rule_remotion_text_animations", description: "Remotion text: typewriter effect, word highlighting, string slicing" },
-  async () => text(RULE_REMOTION_TEXT_ANIMATIONS)
+  async () => ({ content: [{ type: "text", text: RULE_REMOTION_TEXT_ANIMATIONS }] })
 );
 
-server.tool(
+export const ruleRemotionTrimming = server.tool(
   { name: "rule_remotion_trimming", description: "Remotion trimming: cut start/end of animations with negative Sequence from" },
-  async () => text(RULE_REMOTION_TRIMMING)
+  async () => ({ content: [{ type: "text", text: RULE_REMOTION_TRIMMING }] })
 );
 
 // --- Video tool ---
@@ -97,22 +103,35 @@ const createVideoSchema = z.object({
   height: z.number().optional().describe("Height in pixels (default: 1080)"),
 });
 
-server.tool(
+const createVideoOutputSchema = z.object({
+  videoProject: z.string().describe("Serialized compiled Remotion project consumed by the player view"),
+});
+
+export const createVideo = server.tool(
   {
     name: "create_video",
     description:
       "Create or update a video. The `files` param is a JSON string (not an object) mapping file paths to source code. " +
       'Pass it as: files: JSON.stringify({"/src/Video.tsx": "...your code..."}). ' +
       "For edits, only include changed files — previous files are preserved automatically.",
-    schema: createVideoSchema as any,
-    widget: {
+    inputSchema: createVideoSchema,
+    outputSchema: createVideoOutputSchema,
+    view: {
       name: "remotion-player",
-      invoking: "Compiling project...",
-      invoked: "Video ready",
+      description: "Interactive Remotion video player",
+      prefersBorder: true,
+      csp: {
+        resourceDomains: ["https://images.unsplash.com", "https://picsum.photos"],
+      },
     },
   },
   async (rawParams: z.infer<typeof createVideoSchema>, ctx) => {
-    const sessionId = ctx.session?.sessionId ?? "default";
+    const caller = ctx.client.user();
+    const sessionId =
+      caller?.conversationId ??
+      caller?.subject ??
+      ctx.request?.header("mcp-session-id") ??
+      "anonymous";
 
     // Parse files from JSON string
     let files: Record<string, string>;
@@ -167,4 +186,4 @@ server.get("/.well-known/openai-apps-challenge", (c) => {
   return c.text("gP0NHv0ywqzsT3-iJ5is_xR6HysaW9Gbls7TeneGl8M");
 });
 
-await server.listen(port);
+export default server;

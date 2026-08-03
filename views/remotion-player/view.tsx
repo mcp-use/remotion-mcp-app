@@ -8,11 +8,16 @@ import React, {
   type ErrorInfo,
   type ReactNode,
 } from "react";
-import { z } from "zod";
-import { useWidget, McpUseProvider, type WidgetMetadata } from "mcp-use/react";
+import {
+  ThemeProvider,
+  useDisplayMode,
+  useSendFollowUp,
+  useToolContext,
+  useViewTheme,
+} from "mcp-use/react";
 import { Player, type PlayerRef } from "@remotion/player";
-import { compileBundle } from "./components/CodeComposition";
-import type { VideoMeta, VideoProjectData } from "../../types";
+import { compileBundle } from "./components/CodeComposition.js";
+import type { VideoMeta, VideoProjectData } from "./types.js";
 
 import { GrainGradient } from "@paper-design/shaders-react";
 
@@ -86,32 +91,6 @@ class PlayerErrorBoundary extends Component<
     return this.props.children;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Widget metadata
-// ---------------------------------------------------------------------------
-
-const propSchema = z.object({
-  videoProject: z
-    .string()
-    .optional()
-    .describe("JSON with bundled project code, composition metadata, defaultProps and inputProps"),
-});
-
-export const widgetMetadata: WidgetMetadata = {
-  description: "Remotion video player",
-  props: propSchema,
-  exposeAsTool: false,
-  metadata: {
-    prefersBorder: true,
-    autoResize: true,
-    widgetDescription: "Renders a Remotion video",
-    csp: {
-      resourceDomains: ["https://images.unsplash.com", "https://picsum.photos"],
-      scriptDirectives: ["'unsafe-eval'"],
-    },
-  },
-};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -556,31 +535,24 @@ function PlayerView({
 // ---------------------------------------------------------------------------
 
 function RemotionPlayerWidgetInner() {
-  const {
-    isPending,
-    theme,
-    displayMode,
-    isAvailable,
-    isStreaming,
-    sendFollowUpMessage,
-    requestDisplayMode,
-  } = useWidget<z.infer<typeof propSchema>>();
+  const view = useToolContext<"create_video">();
+  const theme = useViewTheme();
+  const { displayMode, availableDisplayModes, requestDisplayMode } = useDisplayMode();
+  const sendFollowUpMessage = useSendFollowUp();
 
   const prevRef = useRef<VideoProjectData | null>(null);
+  const isAvailable = availableDisplayModes.includes("fullscreen");
   const isFullscreen = displayMode === "fullscreen" && isAvailable;
   const dark = theme === "dark";
   const bg = dark ? "#141414" : "#fff";
-  const isBusy = isPending || isStreaming;
+  const isPending = view.status === "pending";
+  const isBusy = isPending;
 
   // --- Parse project data ---
-  const { output } = useWidget<z.infer<typeof propSchema>>() as any;
-
-  // The compiled video project comes from structuredContent (tool output),
-  // not from props (tool input). Props contains what the model sent (files, title, etc.)
+  // The compiled video project comes from structuredContent, not tool input.
   const rawVideoProject = useMemo(() => {
-    const value = (output as Record<string, unknown> | null)?.videoProject;
-    return typeof value === "string" ? value : null;
-  }, [output]);
+    return view.status === "ready" ? view.toolOutput.videoProject : null;
+  }, [view]);
 
   const finalData = useMemo(() => {
     if (isPending || !rawVideoProject) return null;
@@ -638,7 +610,9 @@ function RemotionPlayerWidgetInner() {
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
-        try { sendFollowUpMessage(`calculateMetadata() failed:\n\n\`${(error as Error).message}\`\n\nPlease fix the project and call create_video or update_video again.`); } catch {}
+        void sendFollowUpMessage({
+          prompt: `calculateMetadata() failed:\n\n\`${(error as Error).message}\`\n\nPlease fix the project and call create_video again.`,
+        }).catch(() => {});
       });
     return () => controller.abort();
   }, [compiled, data, mergedProps, sendFollowUpMessage]);
@@ -646,13 +620,15 @@ function RemotionPlayerWidgetInner() {
   // --- Send follow-up on compile error ---
   useEffect(() => {
     if (!compileError || data?.compileError) return;
-    try { sendFollowUpMessage(`The project had a compilation error:\n\n\`${compileError}\`\n\nPlease fix the files and call create_video or update_video again.`); } catch {}
+    void sendFollowUpMessage({
+      prompt: `The project had a compilation error:\n\n\`${compileError}\`\n\nPlease fix the files and call create_video again.`,
+    }).catch(() => {});
   }, [compileError, sendFollowUpMessage]);
 
   // --- Fullscreen toggle ---
   const toggleFullscreen = useCallback(() => {
     const nextMode = isFullscreen ? "inline" : "fullscreen";
-    requestDisplayMode(nextMode).catch((error) => {
+    requestDisplayMode({ mode: nextMode }).catch((error) => {
       console.error(`[remotion-player] Failed to request display mode "${nextMode}"`, error);
     });
   }, [isFullscreen, requestDisplayMode]);
@@ -660,12 +636,18 @@ function RemotionPlayerWidgetInner() {
   // --- Player error handler ---
   const handlePlayerError = useCallback(
     (msg: string) => {
-      try { sendFollowUpMessage(`The video had a runtime error:\n\n\`${msg}\`\n\nPlease fix the project and call create_video or update_video again.`); } catch {}
+      void sendFollowUpMessage({
+        prompt: `The video had a runtime error:\n\n\`${msg}\`\n\nPlease fix the project and call create_video again.`,
+      }).catch(() => {});
     },
     [sendFollowUpMessage]
   );
 
   const meta = resolvedMeta ?? data?.meta ?? { title: "Untitled", compositionId: "Main", width: 1920, height: 1080, fps: 30, durationInFrames: 150 };
+
+  if (view.status === "error") {
+    return <EmptyView dark={dark} />;
+  }
 
   // --- Loading state (no data yet, tool is running) ---
   if (isLoading) {
@@ -721,15 +703,15 @@ function RemotionPlayerWidgetInner() {
 }
 
 // ---------------------------------------------------------------------------
-// Export with error boundary + provider
+// Export with error boundary + theme provider
 // ---------------------------------------------------------------------------
 
 export default function RemotionPlayerWidget() {
   return (
-    <McpUseProvider autoSize>
+    <ThemeProvider>
       <WidgetErrorBoundary>
         <RemotionPlayerWidgetInner />
       </WidgetErrorBoundary>
-    </McpUseProvider>
+    </ThemeProvider>
   );
 }

@@ -1,20 +1,19 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2024",
     "jsx": "react-jsx",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "strict": true,
-    "declaration": true,
-    "declarationMap": true,
     "skipDefaultLibCheck": true,
-    "outDir": "./dist",
-    "sourceMap": true,
+    "noEmit": true,
+    "noUncheckedSideEffectImports": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["index.ts", "types.ts", "cheatsheet.ts", "resources/**/*"],
+  "include": ["index.ts", "mcp-env.d.ts", "types.ts", "utils.ts", "rules/**/*", "views/**/*", ".mcp-use/**/*.d.ts"],
   "exclude": ["node_modules", "dist", ".mcp-use"]
 }

@@ -3,7 +3,7 @@ import * as ReactModule from "react";
 import * as ReactJsxRuntimeModule from "react/jsx-runtime";
 import * as ReactJsxDevRuntimeModule from "react/jsx-dev-runtime";
 import * as RemotionModule from "remotion";
-import { RUNTIME_BUNDLE_GLOBAL, RUNTIME_PACKAGE_GLOBAL } from "../../../types";
+import { RUNTIME_BUNDLE_GLOBAL, RUNTIME_PACKAGE_GLOBAL } from "../types.js";
 
 export type RuntimeMetadataInput = {
   props: Record<string, unknown>;
