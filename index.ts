@@ -120,7 +120,7 @@ export const createVideo = server.tool(
     view: {
       name: "remotion-player",
       description: "Interactive Remotion video player",
-      prefersBorder: true,
+      prefersBorder: false,
       csp: {
         resourceDomains: ["https://images.unsplash.com", "https://picsum.photos"],
       },
