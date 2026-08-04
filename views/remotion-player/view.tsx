@@ -11,6 +11,7 @@ import React, {
 import {
   ThemeProvider,
   useCallTool,
+  useDisplayMode,
   useSendFollowUp,
   useToolContext,
   useViewTheme,
@@ -399,6 +400,9 @@ function PlayerView({
   meta,
   dark,
   isBusy,
+  isFullscreen,
+  canFullscreen,
+  onToggleFullscreen,
   loadingWord,
   loadingVisible,
   onPlayerError,
@@ -409,15 +413,43 @@ function PlayerView({
   meta: VideoMeta;
   dark: boolean;
   isBusy: boolean;
+  isFullscreen: boolean;
+  canFullscreen: boolean;
+  onToggleFullscreen: () => void;
   loadingWord: string;
   loadingVisible: boolean;
   onPlayerError: (msg: string) => void;
 }) {
   const ref = useRef<PlayerRef>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsNativeFullscreen(document.fullscreenElement === containerRef.current);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const handleFullscreen = useCallback(() => {
+    if (canFullscreen) {
+      onToggleFullscreen();
+      return;
+    }
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+      return;
+    }
+    void containerRef.current?.requestFullscreen();
+  }, [canFullscreen, onToggleFullscreen]);
+
+  const fullscreenActive = isFullscreen || isNativeFullscreen;
 
   if (compileError) {
     return (
       <div
+        ref={containerRef}
         style={{
           padding: 16,
           background: dark ? "#1c1c1c" : "#f5f5f5",
@@ -467,6 +499,47 @@ function PlayerView({
           style={{ width: "100%", maxWidth: "100%", margin: 0 }}
         />
         {isBusy && <EditingOverlay word={loadingWord} visible={loadingVisible} />}
+        <button
+            type="button"
+            onClick={handleFullscreen}
+            aria-label={fullscreenActive ? "Exit fullscreen" : "Enter fullscreen"}
+            title={fullscreenActive ? "Exit fullscreen" : "Fullscreen"}
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              zIndex: 20,
+              width: 34,
+              height: 34,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              background: "rgba(0,0,0,0.48)",
+              border: "1px solid rgba(255,255,255,0.22)",
+              borderRadius: 8,
+              cursor: "pointer",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+            }}
+          >
+            {fullscreenActive ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="6 2 6 6 2 6" />
+                <polyline points="10 14 10 10 14 10" />
+                <line x1="2" y1="2" x2="6" y2="6" />
+                <line x1="14" y1="14" x2="10" y2="10" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="10 2 14 2 14 6" />
+                <polyline points="6 14 2 14 2 10" />
+                <line x1="14" y1="2" x2="10" y2="6" />
+                <line x1="2" y1="14" x2="6" y2="10" />
+              </svg>
+            )}
+          </button>
       </div>
     </PlayerErrorBoundary>
   );
@@ -480,6 +553,7 @@ function RemotionPlayerWidgetInner() {
   const view = useToolContext<"create_video">();
   const createVideo = useCallTool("create_video");
   const theme = useViewTheme();
+  const { displayMode, availableDisplayModes, requestDisplayMode } = useDisplayMode();
   const sendFollowUpMessage = useSendFollowUp();
 
   const prevRef = useRef<VideoProjectData | null>(null);
@@ -487,6 +561,8 @@ function RemotionPlayerWidgetInner() {
   const [compiled, setCompiled] = useState<CompiledBundle | { error: string } | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
   const dark = theme === "dark";
+  const canFullscreen = availableDisplayModes.includes("fullscreen");
+  const isFullscreen = canFullscreen && displayMode === "fullscreen";
   const isPending = view.status === "pending";
 
   // --- Parse project data ---
@@ -647,6 +723,10 @@ function RemotionPlayerWidgetInner() {
     [sendFollowUpMessage]
   );
 
+  const toggleFullscreen = useCallback(() => {
+    requestDisplayMode({ mode: isFullscreen ? "inline" : "fullscreen" }).catch(() => {});
+  }, [isFullscreen, requestDisplayMode]);
+
   const meta = resolvedMeta ?? data?.meta ?? { title: "Untitled", compositionId: "Main", width: 1920, height: 1080, fps: 30, durationInFrames: 150 };
 
   if (view.status === "error") {
@@ -678,11 +758,36 @@ function RemotionPlayerWidgetInner() {
       meta={meta}
       dark={dark}
       isBusy={isBusy}
+      isFullscreen={isFullscreen}
+      canFullscreen={canFullscreen}
+      onToggleFullscreen={toggleFullscreen}
       loadingWord={loadingWord}
       loadingVisible={loadingVisible}
       onPlayerError={handlePlayerError}
     />
   );
+
+  if (isFullscreen) {
+    const aspectRatio = meta.width / meta.height;
+    return (
+      <div
+        style={{
+          width: "100vw",
+          height: "100vh",
+          padding: 12,
+          boxSizing: "border-box",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#000",
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: `calc((100vh - 24px) * ${aspectRatio})` }}>
+          {playerEl}
+        </div>
+      </div>
+    );
+  }
 
   return playerEl;
 }
