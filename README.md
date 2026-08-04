@@ -58,7 +58,7 @@ The flow:
 1. The model calls `create_video` with React/Remotion source files
 2. The server compiles the project with esbuild (sub-second)
 3. The compiled bundle is sent back as `structuredContent`, and the View renders it as a playable video
-4. For edits, the model calls `create_video` again with only changed files -- the View renders the updated video
+4. For edits, the mounted View exposes `update_video`; it sends only changed files through the server compiler and swaps the player in place
 
 ```
 Model                     MCP App (Server + View)
@@ -68,14 +68,14 @@ Model                     MCP App (Server + View)
   |<- structuredContent -----|
   |                          |-- View renders video inline
   |                          |
-  |-- create_video({edits}) ->|
-  |                          |-- merge + recompile
-  |                          |-- View renders the updated result
+  |-- update_video({edits}) ->|  (View tool)
+  |                          |-- create_video merges + recompiles
+  |                          |-- existing View swaps the player in place
 ```
 
 ### Single tool design
 
-There is one tool: `create_video`. It handles both creation and editing. The `files` parameter is always required -- for edits, only send changed files. The server merges them with the previous session state.
+The server exposes one model-visible tool, `create_video`, for the initial composition. Once its View is mounted, the View exposes an ephemeral `update_video` tool. That tool reuses the server compiler, merges only the changed files with the current session project, and replaces the mounted player without creating another View result.
 
 ### Rule tools
 
@@ -98,6 +98,7 @@ The Remotion Player View is what makes this an MCP App rather than a plain MCP s
 - Live video playback with controls
 - Animated loading state with shader gradient while the model writes code
 - Editing overlay (blur + gradient) when updating an existing video
+- Ephemeral `update_video` View tool for in-place agent edits
 - Fullscreen mode
 - Error display with compilation error details
 
@@ -116,6 +117,8 @@ cd remotion-mcp-app
 npm install
 npm run dev
 ```
+
+`npm run dev` builds the View inline before opening the embedded Inspector. This keeps the v2 View compatible with the Inspector sandbox, so the animated gradient loading state mounts instead of getting stuck on the host's fallback `Compiling...` spinner. Use `npm run dev:hmr` when testing outside that embedded sandbox and Vite hot reload is more useful.
 
 The server starts at `http://localhost:3000/mcp`.
 

@@ -19,7 +19,9 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "NODE_OPTIONS='--max-old-space-size=8192' mcp-use build",
-    "dev": "mcp-use dev",
+    "build:inline": "NODE_OPTIONS='--max-old-space-size=8192' mcp-use build --inline",
+    "dev": "npm run build:inline && mcp-use start --with-inspector",
+    "dev:hmr": "mcp-use dev",
     "start": "mcp-use start",
     "deploy": "mcp-use deploy",
     "typecheck": "mcp-use typecheck"

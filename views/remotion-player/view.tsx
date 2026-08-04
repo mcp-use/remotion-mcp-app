@@ -11,10 +11,10 @@ import React, {
 import {
   ModelContext,
   ThemeProvider,
+  useCallTool,
   useDisplayMode,
   useSendFollowUp,
   useToolContext,
-  useViewState,
   useViewTheme,
   useViewTool,
 } from "mcp-use/react";
@@ -456,25 +456,20 @@ function EditingOverlay({ word, visible }: { word: string; visible: boolean }) {
 // Player view
 // ---------------------------------------------------------------------------
 
-const seekVideoSchema = z.object({
-  frame: z.number().int().nonnegative().describe("Zero-based frame to seek to"),
+const updateVideoSchema = z.object({
+  files: z.string().describe(
+    'JSON string containing only the changed files, for example {"/src/Video.tsx":"...updated code..."}'
+  ),
+  entryFile: z.string().optional().describe("Updated entry file path, if it changed"),
+  title: z.string().optional().describe("Updated title shown above the mounted video"),
+  durationInFrames: z.number().positive().optional().describe("Updated video duration in frames"),
+  fps: z.number().positive().optional().describe("Updated frames per second"),
+  width: z.number().positive().optional().describe("Updated composition width in pixels"),
+  height: z.number().positive().optional().describe("Updated composition height in pixels"),
 });
 
-const setVideoVolumeSchema = z.object({
-  volume: z.number().min(0).max(1).describe("Playback volume from 0 to 1"),
-});
-
-const setVideoLoopSchema = z.object({
-  loop: z.boolean().describe("Whether playback should loop at the end"),
-});
-
-const inspectVideoStateSchema = z.object({
-  currentFrame: z.number().int().nonnegative(),
-  durationInFrames: z.number().int().positive(),
-  fps: z.number().positive(),
-  isPlaying: z.boolean(),
-  volume: z.number().min(0).max(1),
-  loop: z.boolean(),
+const updateVideoOutputSchema = z.object({
+  videoProject: z.string().describe("Serialized updated project mounted by the current View"),
 });
 
 function PlayerView({
@@ -501,134 +496,6 @@ function PlayerView({
   onPlayerError: (msg: string) => void;
 }) {
   const ref = useRef<PlayerRef>(null);
-  const [playerState, setPlayerState] = useViewState({ volume: 1, loop: true });
-  const volume =
-    typeof playerState.volume === "number" && Number.isFinite(playerState.volume)
-      ? Math.min(1, Math.max(0, playerState.volume))
-      : 1;
-  const loop = typeof playerState.loop === "boolean" ? playerState.loop : true;
-  const controlsEnabled = !!compiledProject && !("error" in compiledProject) && !compileError;
-
-  useViewTool(
-    {
-      name: "play_video",
-      title: "Play video",
-      description: "Play the video currently mounted in the Remotion View",
-      enabled: controlsEnabled,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-    },
-    async () => {
-      if (!ref.current) {
-        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
-      }
-      ref.current.play();
-      return { content: [{ type: "text", text: "The video is playing." }] };
-    }
-  );
-
-  useEffect(() => {
-    if (controlsEnabled) ref.current?.setVolume(volume);
-  }, [controlsEnabled, volume]);
-
-  useViewTool(
-    {
-      name: "pause_video",
-      title: "Pause video",
-      description: "Pause the video currently mounted in the Remotion View",
-      enabled: controlsEnabled,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-    },
-    async () => {
-      if (!ref.current) {
-        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
-      }
-      ref.current.pause();
-      return { content: [{ type: "text", text: "The video is paused." }] };
-    }
-  );
-
-  useViewTool(
-    {
-      name: "seek_video",
-      title: "Seek video",
-      description: "Move the mounted Remotion video to a specific frame",
-      inputSchema: seekVideoSchema,
-      enabled: controlsEnabled,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-    },
-    async ({ frame }) => {
-      if (!ref.current) {
-        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
-      }
-      const targetFrame = Math.min(frame, Math.max(0, meta.durationInFrames - 1));
-      ref.current.seekTo(targetFrame);
-      return { content: [{ type: "text", text: `Moved the video to frame ${targetFrame}.` }] };
-    }
-  );
-
-  useViewTool(
-    {
-      name: "set_video_volume",
-      title: "Set video volume",
-      description: "Set the playback volume of the mounted Remotion video",
-      inputSchema: setVideoVolumeSchema,
-      enabled: controlsEnabled,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-    },
-    async ({ volume: nextVolume }) => {
-      if (!ref.current) {
-        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
-      }
-      ref.current.setVolume(nextVolume);
-      setPlayerState((previous) => ({ ...previous, volume: nextVolume }));
-      return { content: [{ type: "text", text: `Set the video volume to ${nextVolume}.` }] };
-    }
-  );
-
-  useViewTool(
-    {
-      name: "set_video_loop",
-      title: "Set video looping",
-      description: "Enable or disable looping for the mounted Remotion video",
-      inputSchema: setVideoLoopSchema,
-      enabled: controlsEnabled,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-    },
-    async ({ loop: nextLoop }) => {
-      setPlayerState((previous) => ({ ...previous, loop: nextLoop }));
-      return {
-        content: [{ type: "text", text: `Video looping is now ${nextLoop ? "enabled" : "disabled"}.` }],
-      };
-    }
-  );
-
-  useViewTool(
-    {
-      name: "inspect_video_state",
-      title: "Inspect video state",
-      description: "Inspect the current playback state of the mounted Remotion video",
-      outputSchema: inspectVideoStateSchema,
-      enabled: controlsEnabled,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-    },
-    async () => {
-      if (!ref.current) {
-        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
-      }
-      const state = {
-        currentFrame: ref.current.getCurrentFrame(),
-        durationInFrames: meta.durationInFrames,
-        fps: meta.fps,
-        isPlaying: ref.current.isPlaying(),
-        volume: ref.current.getVolume(),
-        loop,
-      };
-      return {
-        content: [{ type: "text", text: JSON.stringify(state) }],
-        structuredContent: state,
-      };
-    }
-  );
 
   if (compileError) {
     return (
@@ -656,7 +523,7 @@ function PlayerView({
 
   return (
     <ModelContext
-      content={`Remotion video "${meta.title}" is mounted at ${meta.width}x${meta.height}, ${meta.fps} FPS, ${meta.durationInFrames} frames. Playback volume is ${volume}; looping is ${loop ? "enabled" : "disabled"}. View tools can play, pause, seek, change volume or looping, and inspect playback state.`}
+      content={`Remotion video "${meta.title}" is mounted at ${meta.width}x${meta.height}, ${meta.fps} FPS, ${meta.durationInFrames} frames. The update_video View tool can revise this mounted composition in place.`}
     >
       <PlayerErrorBoundary onError={onPlayerError} dark={dark}>
         <div style={{ position: "relative", width: "100%", maxWidth: isFullscreen ? "100%" : undefined, margin: isFullscreen ? "0 auto" : undefined }}>
@@ -670,7 +537,7 @@ function PlayerView({
             compositionHeight={meta.height}
             controls
             autoPlay
-            loop={loop}
+            loop
             style={{
               width: "100%",
               maxWidth: "100%",
@@ -693,17 +560,20 @@ function PlayerView({
 
 function RemotionPlayerWidgetInner() {
   const view = useToolContext<"create_video">();
+  const createVideo = useCallTool("create_video");
   const theme = useViewTheme();
   const { displayMode, availableDisplayModes, requestDisplayMode } = useDisplayMode();
   const sendFollowUpMessage = useSendFollowUp();
 
   const prevRef = useRef<VideoProjectData | null>(null);
+  const [viewOverride, setViewOverride] = useState<VideoProjectData | null>(null);
+  const [compiled, setCompiled] = useState<CompiledBundle | { error: string } | null>(null);
+  const [isCompiling, setIsCompiling] = useState(false);
   const isAvailable = availableDisplayModes.includes("fullscreen");
   const isFullscreen = displayMode === "fullscreen" && isAvailable;
   const dark = theme === "dark";
   const bg = dark ? "#141414" : "#fff";
   const isPending = view.status === "pending";
-  const isBusy = isPending;
 
   // --- Parse project data ---
   // The compiled video project comes from structuredContent, not tool input.
@@ -717,31 +587,86 @@ function RemotionPlayerWidgetInner() {
   }, [isPending, rawVideoProject]);
 
   useEffect(() => {
-    if (finalData) prevRef.current = finalData;
-  }, [finalData]);
+    setViewOverride(null);
+  }, [rawVideoProject]);
 
-  const data = finalData || (isBusy ? prevRef.current : null);
+  const currentData = viewOverride ?? finalData;
+  const isBusy = isPending || createVideo.isPending || isCompiling;
+  const data = currentData || (isBusy ? prevRef.current : null);
   const hasData = !!data;
   const isLoading = !hasData && isBusy;
+
+  useEffect(() => {
+    if (currentData) prevRef.current = currentData;
+  }, [currentData]);
+
+  useViewTool(
+    {
+      name: "update_video",
+      title: "Update video in place",
+      description:
+        "Update files or metadata for the video mounted in this View and replace it without rendering a new View",
+      inputSchema: updateVideoSchema,
+      outputSchema: updateVideoOutputSchema,
+      enabled: hasData && !createVideo.isPending,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async (args) => {
+      try {
+        const result = await createVideo.callTool(args);
+        const videoProject = result.structuredContent?.videoProject;
+        if (typeof videoProject !== "string") {
+          return {
+            isError: true,
+            content: [{ type: "text", text: "The update did not return a video project." }],
+          };
+        }
+
+        const nextData = parseVideoProject({ videoProject });
+        if (!nextData) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: "The updated video project could not be parsed." }],
+          };
+        }
+
+        prevRef.current = nextData;
+        setViewOverride(nextData);
+        return result;
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Could not update the mounted video: ${(error as Error).message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
 
   // --- Loading word ---
   const { word: loadingWord, visible: loadingVisible } = useLoadingWord(isBusy);
 
   // --- Compile bundle ---
-  const [compiled, setCompiled] = useState<CompiledBundle | { error: string } | null>(null);
-
   useEffect(() => {
     let active = true;
     if (!data || data.compileError) {
       setCompiled(null);
+      setIsCompiling(false);
       return () => {
         active = false;
       };
     }
 
-    setCompiled(null);
+    setIsCompiling(true);
     void compileBundle(data.bundle).then((result) => {
-      if (active) setCompiled(result);
+      if (active) {
+        setCompiled(result);
+        setIsCompiling(false);
+      }
     });
 
     return () => {
