@@ -9,10 +9,8 @@ import React, {
   type ReactNode,
 } from "react";
 import {
-  ModelContext,
   ThemeProvider,
   useCallTool,
-  useDisplayMode,
   useSendFollowUp,
   useToolContext,
   useViewTheme,
@@ -234,21 +232,16 @@ function LoadingView({
   word,
   visible,
   dark,
-  fullscreen,
-  onExitFullscreen,
 }: {
   word: string;
   visible: boolean;
   dark: boolean;
-  fullscreen: boolean;
-  onExitFullscreen?: () => void;
 }) {
-  const height = fullscreen ? "100vh" : 260;
   return (
     <div
       style={{
         position: "relative",
-        height,
+        height: 260,
         minHeight: 260,
         borderRadius: 0,
         overflow: "hidden",
@@ -256,25 +249,6 @@ function LoadingView({
       }}
     >
       <ShaderBackground style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-      {fullscreen && onExitFullscreen && (
-        <div style={{ position: "absolute", top: 10, right: 10, zIndex: 2 }}>
-          <button
-            onClick={onExitFullscreen}
-            style={{
-              background: "rgba(255,255,255,0.08)",
-              border: "none",
-              cursor: "pointer",
-              padding: "7px 10px",
-              color: "#f4f4f4",
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 600,
-            }}
-          >
-            Exit fullscreen
-          </button>
-        </div>
-      )}
       <div
         style={{
           position: "relative",
@@ -328,64 +302,6 @@ function EmptyView({ dark }: { dark: boolean }) {
       }}
     >
       No video project data was returned. Check the tool output and call create_video or update_video again.
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Header bar
-// ---------------------------------------------------------------------------
-
-function HeaderBar({
-  title,
-  dark,
-  isFullscreen,
-  isAvailable,
-  onToggleFullscreen,
-}: {
-  title: string;
-  dark: boolean;
-  isFullscreen: boolean;
-  isAvailable: boolean;
-  onToggleFullscreen: () => void;
-}) {
-  const fg = dark ? "#e0e0e0" : "#1a1a1a";
-  const fg2 = dark ? "#777" : "#888";
-
-  const fsIcon = isFullscreen ? (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="6 2 6 6 2 6" /><polyline points="10 14 10 10 14 10" />
-      <line x1="2" y1="2" x2="6" y2="6" /><line x1="14" y1="14" x2="10" y2="10" />
-    </svg>
-  ) : (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="10 2 14 2 14 6" /><polyline points="6 14 2 14 2 10" />
-      <line x1="14" y1="2" x2="10" y2="6" /><line x1="2" y1="14" x2="6" y2="10" />
-    </svg>
-  );
-
-  return (
-    <div style={{ padding: "6px 10px 6px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-      <span style={{ color: fg, fontSize: 13, fontWeight: 500 }}>{title}</span>
-      <button
-        onClick={onToggleFullscreen}
-        disabled={!isAvailable}
-        title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-        style={{
-          background: "none",
-          border: "none",
-          cursor: isAvailable ? "pointer" : "not-allowed",
-          padding: 6,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: fg2,
-          borderRadius: 4,
-          opacity: isAvailable ? 0.7 : 0.35,
-        }}
-      >
-        {fsIcon}
-      </button>
     </div>
   );
 }
@@ -479,7 +395,6 @@ function PlayerView({
   meta,
   dark,
   isBusy,
-  isFullscreen,
   loadingWord,
   loadingVisible,
   onPlayerError,
@@ -490,7 +405,6 @@ function PlayerView({
   meta: VideoMeta;
   dark: boolean;
   isBusy: boolean;
-  isFullscreen: boolean;
   loadingWord: string;
   loadingVisible: boolean;
   onPlayerError: (msg: string) => void;
@@ -522,35 +436,24 @@ function PlayerView({
   }
 
   return (
-    <ModelContext
-      content={`Remotion video "${meta.title}" is mounted at ${meta.width}x${meta.height}, ${meta.fps} FPS, ${meta.durationInFrames} frames. The update_video View tool can revise this mounted composition in place.`}
-    >
-      <PlayerErrorBoundary onError={onPlayerError} dark={dark}>
-        <div style={{ position: "relative", width: "100%", maxWidth: isFullscreen ? "100%" : undefined, margin: isFullscreen ? "0 auto" : undefined }}>
-          <Player
-            ref={ref}
-            component={compiledProject.component as any}
-            inputProps={mergedProps}
-            durationInFrames={meta.durationInFrames}
-            fps={meta.fps}
-            compositionWidth={meta.width}
-            compositionHeight={meta.height}
-            controls
-            autoPlay
-            loop
-            style={{
-              width: "100%",
-              maxWidth: "100%",
-              maxHeight: isFullscreen ? "calc(100vh - 56px)" : undefined,
-              margin: "0 auto",
-            }}
-          />
-          {isBusy && (
-            <EditingOverlay word={loadingWord} visible={loadingVisible} />
-          )}
-        </div>
-      </PlayerErrorBoundary>
-    </ModelContext>
+    <PlayerErrorBoundary onError={onPlayerError} dark={dark}>
+      <div style={{ position: "relative", width: "100%" }}>
+        <Player
+          ref={ref}
+          component={compiledProject.component as any}
+          inputProps={mergedProps}
+          durationInFrames={meta.durationInFrames}
+          fps={meta.fps}
+          compositionWidth={meta.width}
+          compositionHeight={meta.height}
+          controls
+          autoPlay
+          loop
+          style={{ width: "100%", maxWidth: "100%", margin: 0 }}
+        />
+        {isBusy && <EditingOverlay word={loadingWord} visible={loadingVisible} />}
+      </div>
+    </PlayerErrorBoundary>
   );
 }
 
@@ -562,17 +465,13 @@ function RemotionPlayerWidgetInner() {
   const view = useToolContext<"create_video">();
   const createVideo = useCallTool("create_video");
   const theme = useViewTheme();
-  const { displayMode, availableDisplayModes, requestDisplayMode } = useDisplayMode();
   const sendFollowUpMessage = useSendFollowUp();
 
   const prevRef = useRef<VideoProjectData | null>(null);
   const [viewOverride, setViewOverride] = useState<VideoProjectData | null>(null);
   const [compiled, setCompiled] = useState<CompiledBundle | { error: string } | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
-  const isAvailable = availableDisplayModes.includes("fullscreen");
-  const isFullscreen = displayMode === "fullscreen" && isAvailable;
   const dark = theme === "dark";
-  const bg = dark ? "#141414" : "#fff";
   const isPending = view.status === "pending";
 
   // --- Parse project data ---
@@ -723,14 +622,6 @@ function RemotionPlayerWidgetInner() {
     }).catch(() => {});
   }, [compileError, sendFollowUpMessage]);
 
-  // --- Fullscreen toggle ---
-  const toggleFullscreen = useCallback(() => {
-    const nextMode = isFullscreen ? "inline" : "fullscreen";
-    requestDisplayMode({ mode: nextMode }).catch((error) => {
-      console.error(`[remotion-player] Failed to request display mode "${nextMode}"`, error);
-    });
-  }, [isFullscreen, requestDisplayMode]);
-
   // --- Player error handler ---
   const handlePlayerError = useCallback(
     (msg: string) => {
@@ -754,8 +645,6 @@ function RemotionPlayerWidgetInner() {
         word={loadingWord}
         visible={loadingVisible}
         dark={dark}
-        fullscreen={isFullscreen}
-        onExitFullscreen={isFullscreen ? toggleFullscreen : undefined}
       />
     );
   }
@@ -774,30 +663,13 @@ function RemotionPlayerWidgetInner() {
       meta={meta}
       dark={dark}
       isBusy={isBusy}
-      isFullscreen={isFullscreen}
       loadingWord={loadingWord}
       loadingVisible={loadingVisible}
       onPlayerError={handlePlayerError}
     />
   );
 
-  if (isFullscreen) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#000", fontFamily: "system-ui, sans-serif" }}>
-        <HeaderBar title={meta.title} dark={dark} isFullscreen isAvailable={isAvailable} onToggleFullscreen={toggleFullscreen} />
-        <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 16px 16px", boxSizing: "border-box" }}>
-          <div style={{ width: "100%", maxWidth: 1680 }}>{playerEl}</div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ overflow: "hidden", background: bg, fontFamily: "system-ui, sans-serif" }}>
-      <HeaderBar title={meta.title} dark={dark} isFullscreen={false} isAvailable={isAvailable} onToggleFullscreen={toggleFullscreen} />
-      {playerEl}
-    </div>
-  );
+  return playerEl;
 }
 
 // ---------------------------------------------------------------------------
