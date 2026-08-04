@@ -243,7 +243,9 @@ function LoadingView({
         position: "relative",
         height: 260,
         minHeight: 260,
-        borderRadius: 0,
+        border: `1px solid ${dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)"}`,
+        borderRadius: 12,
+        boxSizing: "border-box",
         overflow: "hidden",
         fontFamily: "system-ui, sans-serif",
       }}
@@ -293,7 +295,9 @@ function EmptyView({ dark }: { dark: boolean }) {
         justifyContent: "center",
         minHeight: 200,
         background: dark ? "#141414" : "#fff",
-        borderRadius: 8,
+        border: `1px solid ${dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)"}`,
+        borderRadius: 12,
+        boxSizing: "border-box",
         fontFamily: "system-ui, sans-serif",
         color: dark ? "#777" : "#888",
         fontSize: 13,
@@ -417,7 +421,9 @@ function PlayerView({
         style={{
           padding: 16,
           background: dark ? "#1c1c1c" : "#f5f5f5",
-          borderRadius: 8,
+          border: `1px solid ${dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)"}`,
+          borderRadius: 12,
+          boxSizing: "border-box",
           fontFamily: "system-ui, sans-serif",
           color: dark ? "#ff6b6b" : "#dc3545",
           fontSize: 13,
@@ -437,7 +443,16 @@ function PlayerView({
 
   return (
     <PlayerErrorBoundary onError={onPlayerError} dark={dark}>
-      <div style={{ position: "relative", width: "100%" }}>
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          overflow: "hidden",
+          border: `1px solid ${dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)"}`,
+          borderRadius: 12,
+          boxSizing: "border-box",
+        }}
+      >
         <Player
           ref={ref}
           component={compiledProject.component as any}
