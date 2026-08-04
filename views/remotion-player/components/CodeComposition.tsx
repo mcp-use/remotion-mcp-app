@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import * as ReactModule from "react";
 import * as ReactJsxRuntimeModule from "react/jsx-runtime";
 import * as ReactJsxDevRuntimeModule from "react/jsx-dev-runtime";
@@ -43,13 +43,13 @@ type RuntimeExports = {
   calculateMetadata?: unknown;
 };
 
-export function compileBundle(bundleCode: string): CompiledBundle | { error: string } {
-  try {
-    const evaluator = new Function(
-      `${bundleCode}\nreturn typeof ${RUNTIME_BUNDLE_GLOBAL} !== \"undefined\" ? ${RUNTIME_BUNDLE_GLOBAL} : null;`
-    );
+export async function compileBundle(bundleCode: string): Promise<CompiledBundle | { error: string }> {
+  const moduleSource = `${bundleCode}\nexport default typeof ${RUNTIME_BUNDLE_GLOBAL} !== \"undefined\" ? ${RUNTIME_BUNDLE_GLOBAL} : null;`;
+  const moduleUrl = URL.createObjectURL(new Blob([moduleSource], { type: "text/javascript" }));
 
-    const exports = evaluator() as RuntimeExports | null;
+  try {
+    const imported = await import(/* @vite-ignore */ moduleUrl);
+    const exports = imported.default as RuntimeExports | null;
 
     if (!exports || typeof exports !== "object") {
       return { error: "Compilation error: bundle did not return exports." };
@@ -71,6 +71,8 @@ export function compileBundle(bundleCode: string): CompiledBundle | { error: str
     };
   } catch (error) {
     return { error: `Compilation error: ${(error as Error).message}` };
+  } finally {
+    URL.revokeObjectURL(moduleUrl);
   }
 }
 
@@ -78,7 +80,22 @@ export const CodeComposition: React.FC<{
   bundle: string;
   componentProps: Record<string, unknown>;
 }> = ({ bundle, componentProps }) => {
-  const compiled = useMemo(() => compileBundle(bundle), [bundle]);
+  const [compiled, setCompiled] = useState<CompiledBundle | { error: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setCompiled(null);
+    void compileBundle(bundle).then((result) => {
+      if (active) setCompiled(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [bundle]);
+
+  if (!compiled) {
+    return null;
+  }
 
   if ("error" in compiled) {
     throw new Error(compiled.error);

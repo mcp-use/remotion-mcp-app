@@ -10,6 +10,8 @@ import {fade} from "@remotion/transitions/fade";
 import {slide} from "@remotion/transitions/slide";
 import {wipe} from "@remotion/transitions/wipe";
 import {flip} from "@remotion/transitions/flip";
+import {crossZoom} from "@remotion/transitions/cross-zoom";
+import {filmBurn} from "@remotion/transitions/film-burn";
 \`\`\`
 
 Do NOT import \`TransitionSeries\` from \`remotion\`.
@@ -41,8 +43,12 @@ return (
 - slide({ direction: "from-left" })
 - wipe({ direction: "from-right" })
 - flip({ direction: "from-top" })
+- crossZoom()
+- filmBurn()
 
 Directions: "from-left", "from-right", "from-top", "from-bottom"
+
+\`crossZoom()\` and \`filmBurn()\` are available in the installed Remotion 4.0.505 runtime. Use them intentionally: cross-zoom works well for spatial continuity, while film-burn is a stylized transition that should match the requested visual language.
 
 ## Timing
 - linearTiming({ durationInFrames: 20 })

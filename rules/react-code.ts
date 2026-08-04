@@ -25,9 +25,11 @@ Strict contract:
 ## Supported Imports
 
 Use normal imports inside files:
-- remotion
-- any @remotion/* package installed in this MCP app
-- any other npm package installed in this MCP app
+- \`remotion\` 4.0.505, including \`Solid\`, \`CanvasImage\`, \`HtmlInCanvas\`, \`Sequence\`, \`Series\`, \`Audio\`, \`Video\`, and \`OffthreadVideo\`
+- \`@remotion/transitions\` 4.0.505 and its presentation entry points
+- React and other npm packages that are installed in this MCP app
+
+Do not assume every package in the Remotion ecosystem is installed. In particular, do not import optional packages such as \`@remotion/effects\`, \`@remotion/media\`, \`@remotion/captions\`, \`@remotion/gif\`, \`@remotion/lottie\`, or \`@remotion/three\` unless the runtime is expanded to include them.
 
 You can also import other files from your own files map using relative imports.
 
@@ -88,6 +90,14 @@ export function Title({text}) {
   return <div style={{color: "white", fontSize: 72}}>{text}</div>;
 }
 \`\`\`
+
+## Current Remotion 4.0 APIs
+
+- Use \`<Solid color="#..." />\` for a simple full-frame solid background.
+- Use \`<CanvasImage src={...} />\` when canvas-native image drawing or effects are needed.
+- Use \`<HtmlInCanvas>\` when HTML needs to participate in supported canvas/effect workflows.
+- Prefer \`<OffthreadVideo>\` for render-oriented video playback and use \`<Video>\` only when its browser behavior is specifically required.
+- Use \`<Series>\` or \`<TransitionSeries>\` for sequential scenes instead of manually stacking unrestricted components.
 
 ## Scene Management (Critical)
 

@@ -9,14 +9,18 @@ import React, {
   type ReactNode,
 } from "react";
 import {
+  ModelContext,
   ThemeProvider,
   useDisplayMode,
   useSendFollowUp,
   useToolContext,
+  useViewState,
   useViewTheme,
+  useViewTool,
 } from "mcp-use/react";
 import { Player, type PlayerRef } from "@remotion/player";
-import { compileBundle } from "./components/CodeComposition.js";
+import { z } from "zod";
+import { compileBundle, type CompiledBundle } from "./components/CodeComposition.js";
 import type { VideoMeta, VideoProjectData } from "./types.js";
 
 import { GrainGradient } from "@paper-design/shaders-react";
@@ -246,7 +250,7 @@ function LoadingView({
         position: "relative",
         height,
         minHeight: 260,
-        borderRadius: fullscreen ? 0 : 8,
+        borderRadius: 0,
         overflow: "hidden",
         fontFamily: "system-ui, sans-serif",
       }}
@@ -452,6 +456,27 @@ function EditingOverlay({ word, visible }: { word: string; visible: boolean }) {
 // Player view
 // ---------------------------------------------------------------------------
 
+const seekVideoSchema = z.object({
+  frame: z.number().int().nonnegative().describe("Zero-based frame to seek to"),
+});
+
+const setVideoVolumeSchema = z.object({
+  volume: z.number().min(0).max(1).describe("Playback volume from 0 to 1"),
+});
+
+const setVideoLoopSchema = z.object({
+  loop: z.boolean().describe("Whether playback should loop at the end"),
+});
+
+const inspectVideoStateSchema = z.object({
+  currentFrame: z.number().int().nonnegative(),
+  durationInFrames: z.number().int().positive(),
+  fps: z.number().positive(),
+  isPlaying: z.boolean(),
+  volume: z.number().min(0).max(1),
+  loop: z.boolean(),
+});
+
 function PlayerView({
   compiledProject,
   compileError,
@@ -464,7 +489,7 @@ function PlayerView({
   loadingVisible,
   onPlayerError,
 }: {
-  compiledProject: ReturnType<typeof compileBundle> | null;
+  compiledProject: CompiledBundle | null;
   compileError: string | null;
   mergedProps: Record<string, unknown>;
   meta: VideoMeta;
@@ -476,6 +501,134 @@ function PlayerView({
   onPlayerError: (msg: string) => void;
 }) {
   const ref = useRef<PlayerRef>(null);
+  const [playerState, setPlayerState] = useViewState({ volume: 1, loop: true });
+  const volume =
+    typeof playerState.volume === "number" && Number.isFinite(playerState.volume)
+      ? Math.min(1, Math.max(0, playerState.volume))
+      : 1;
+  const loop = typeof playerState.loop === "boolean" ? playerState.loop : true;
+  const controlsEnabled = !!compiledProject && !("error" in compiledProject) && !compileError;
+
+  useViewTool(
+    {
+      name: "play_video",
+      title: "Play video",
+      description: "Play the video currently mounted in the Remotion View",
+      enabled: controlsEnabled,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    },
+    async () => {
+      if (!ref.current) {
+        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
+      }
+      ref.current.play();
+      return { content: [{ type: "text", text: "The video is playing." }] };
+    }
+  );
+
+  useEffect(() => {
+    if (controlsEnabled) ref.current?.setVolume(volume);
+  }, [controlsEnabled, volume]);
+
+  useViewTool(
+    {
+      name: "pause_video",
+      title: "Pause video",
+      description: "Pause the video currently mounted in the Remotion View",
+      enabled: controlsEnabled,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    },
+    async () => {
+      if (!ref.current) {
+        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
+      }
+      ref.current.pause();
+      return { content: [{ type: "text", text: "The video is paused." }] };
+    }
+  );
+
+  useViewTool(
+    {
+      name: "seek_video",
+      title: "Seek video",
+      description: "Move the mounted Remotion video to a specific frame",
+      inputSchema: seekVideoSchema,
+      enabled: controlsEnabled,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    },
+    async ({ frame }) => {
+      if (!ref.current) {
+        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
+      }
+      const targetFrame = Math.min(frame, Math.max(0, meta.durationInFrames - 1));
+      ref.current.seekTo(targetFrame);
+      return { content: [{ type: "text", text: `Moved the video to frame ${targetFrame}.` }] };
+    }
+  );
+
+  useViewTool(
+    {
+      name: "set_video_volume",
+      title: "Set video volume",
+      description: "Set the playback volume of the mounted Remotion video",
+      inputSchema: setVideoVolumeSchema,
+      enabled: controlsEnabled,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    },
+    async ({ volume: nextVolume }) => {
+      if (!ref.current) {
+        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
+      }
+      ref.current.setVolume(nextVolume);
+      setPlayerState((previous) => ({ ...previous, volume: nextVolume }));
+      return { content: [{ type: "text", text: `Set the video volume to ${nextVolume}.` }] };
+    }
+  );
+
+  useViewTool(
+    {
+      name: "set_video_loop",
+      title: "Set video looping",
+      description: "Enable or disable looping for the mounted Remotion video",
+      inputSchema: setVideoLoopSchema,
+      enabled: controlsEnabled,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    },
+    async ({ loop: nextLoop }) => {
+      setPlayerState((previous) => ({ ...previous, loop: nextLoop }));
+      return {
+        content: [{ type: "text", text: `Video looping is now ${nextLoop ? "enabled" : "disabled"}.` }],
+      };
+    }
+  );
+
+  useViewTool(
+    {
+      name: "inspect_video_state",
+      title: "Inspect video state",
+      description: "Inspect the current playback state of the mounted Remotion video",
+      outputSchema: inspectVideoStateSchema,
+      enabled: controlsEnabled,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    },
+    async () => {
+      if (!ref.current) {
+        return { isError: true, content: [{ type: "text", text: "The video player is not ready." }] };
+      }
+      const state = {
+        currentFrame: ref.current.getCurrentFrame(),
+        durationInFrames: meta.durationInFrames,
+        fps: meta.fps,
+        isPlaying: ref.current.isPlaying(),
+        volume: ref.current.getVolume(),
+        loop,
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(state) }],
+        structuredContent: state,
+      };
+    }
+  );
 
   if (compileError) {
     return (
@@ -502,31 +655,35 @@ function PlayerView({
   }
 
   return (
-    <PlayerErrorBoundary onError={onPlayerError} dark={dark}>
-      <div style={{ position: "relative", width: "100%", maxWidth: isFullscreen ? "100%" : undefined, margin: isFullscreen ? "0 auto" : undefined }}>
-        <Player
-          ref={ref}
-          component={compiledProject.component as any}
-          inputProps={mergedProps}
-          durationInFrames={meta.durationInFrames}
-          fps={meta.fps}
-          compositionWidth={meta.width}
-          compositionHeight={meta.height}
-          controls
-          autoPlay
-          loop
-          style={{
-            width: "100%",
-            maxWidth: "100%",
-            maxHeight: isFullscreen ? "calc(100vh - 56px)" : undefined,
-            margin: "0 auto",
-          }}
-        />
-        {isBusy && (
-          <EditingOverlay word={loadingWord} visible={loadingVisible} />
-        )}
-      </div>
-    </PlayerErrorBoundary>
+    <ModelContext
+      content={`Remotion video "${meta.title}" is mounted at ${meta.width}x${meta.height}, ${meta.fps} FPS, ${meta.durationInFrames} frames. Playback volume is ${volume}; looping is ${loop ? "enabled" : "disabled"}. View tools can play, pause, seek, change volume or looping, and inspect playback state.`}
+    >
+      <PlayerErrorBoundary onError={onPlayerError} dark={dark}>
+        <div style={{ position: "relative", width: "100%", maxWidth: isFullscreen ? "100%" : undefined, margin: isFullscreen ? "0 auto" : undefined }}>
+          <Player
+            ref={ref}
+            component={compiledProject.component as any}
+            inputProps={mergedProps}
+            durationInFrames={meta.durationInFrames}
+            fps={meta.fps}
+            compositionWidth={meta.width}
+            compositionHeight={meta.height}
+            controls
+            autoPlay
+            loop={loop}
+            style={{
+              width: "100%",
+              maxWidth: "100%",
+              maxHeight: isFullscreen ? "calc(100vh - 56px)" : undefined,
+              margin: "0 auto",
+            }}
+          />
+          {isBusy && (
+            <EditingOverlay word={loadingWord} visible={loadingVisible} />
+          )}
+        </div>
+      </PlayerErrorBoundary>
+    </ModelContext>
   );
 }
 
@@ -571,9 +728,25 @@ function RemotionPlayerWidgetInner() {
   const { word: loadingWord, visible: loadingVisible } = useLoadingWord(isBusy);
 
   // --- Compile bundle ---
-  const compiled = useMemo(() => {
-    if (!data || data.compileError) return null;
-    return compileBundle(data.bundle);
+  const [compiled, setCompiled] = useState<CompiledBundle | { error: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!data || data.compileError) {
+      setCompiled(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    setCompiled(null);
+    void compileBundle(data.bundle).then((result) => {
+      if (active) setCompiled(result);
+    });
+
+    return () => {
+      active = false;
+    };
   }, [data?.bundle, data?.compileError]);
 
   const compileError = data?.compileError ?? (compiled && "error" in compiled ? compiled.error : null);
@@ -695,7 +868,7 @@ function RemotionPlayerWidgetInner() {
   }
 
   return (
-    <div style={{ borderRadius: 8, overflow: "hidden", background: bg, fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ overflow: "hidden", background: bg, fontFamily: "system-ui, sans-serif" }}>
       <HeaderBar title={meta.title} dark={dark} isFullscreen={false} isAvailable={isAvailable} onToggleFullscreen={toggleFullscreen} />
       {playerEl}
     </div>

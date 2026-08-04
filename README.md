@@ -151,7 +151,7 @@ views/remotion-player/       -- MCP App View (React + Remotion Player)
   view.tsx                   -- Main View component
   types.ts                   -- Browser-only View types and runtime constants
   components/
-    CodeComposition.tsx      -- Bundle compiler (eval + runtime shim)
+    CodeComposition.tsx      -- CSP-safe blob module compiler + runtime shim
 ```
 
 ## Tool schema
