@@ -28,17 +28,21 @@
   },
   "dependencies": {
     "@paper-design/shaders-react": "^0.0.71",
-    "@posthog/mcp": "^0.10.3",
+    "@posthog/mcp": "0.10.3",
     "@remotion/player": "4.0.505",
     "@remotion/transitions": "4.0.505",
     "esbuild": "^0.28.1",
     "mcp-use": "^2.0.4",
     "node-mocks-http": "^1.17.2",
+    "posthog-node": "5.47.7",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "remotion": "4.0.505",
     "tailwindcss": "^4.0.0",
     "zod": "^4.4.3"
+  },
+  "overrides": {
+    "@posthog/core": "1.46.5"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
