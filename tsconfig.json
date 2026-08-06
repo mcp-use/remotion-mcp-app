@@ -14,6 +14,6 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["index.ts", "mcp-env.d.ts", "types.ts", "utils.ts", "rules/**/*", "views/**/*", ".mcp-use/**/*.d.ts"],
+  "include": ["index.ts", "mcp-env.d.ts", "types.ts", "utils.ts", "skill-extension.ts", "views/**/*", ".mcp-use/**/*.d.ts"],
   "exclude": ["node_modules", "dist", ".mcp-use"]
 }

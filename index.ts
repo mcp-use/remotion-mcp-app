@@ -1,14 +1,7 @@
 import { MCPServer } from "mcp-use";
 import { z } from "zod";
 import { observeMcpToolCall, posthog } from "./observability.js";
-import { RULE_INDEX } from "./rules/index.js";
-import { RULE_REACT_CODE } from "./rules/react-code.js";
-import { RULE_REMOTION_ANIMATIONS } from "./rules/remotion-animations.js";
-import { RULE_REMOTION_TIMING } from "./rules/remotion-timing.js";
-import { RULE_REMOTION_SEQUENCING } from "./rules/remotion-sequencing.js";
-import { RULE_REMOTION_TRANSITIONS } from "./rules/remotion-transitions.js";
-import { RULE_REMOTION_TEXT_ANIMATIONS } from "./rules/remotion-text-animations.js";
-import { RULE_REMOTION_TRIMMING } from "./rules/remotion-trimming.js";
+import { registerSkillExtension } from "./skill-extension.js";
 import {
   DEFAULT_META,
   compileAndRespondWithProject,
@@ -30,52 +23,12 @@ if (posthog) {
   server.use("mcp:tools/call", observeMcpToolCall);
 }
 
+registerSkillExtension(server);
+
 process.on("SIGTERM", async () => {
   if (posthog) await posthog.shutdown();
   process.exit(0);
 });
-
-// --- Rule tools ---
-
-export const readMe = server.tool(
-  { name: "read_me", description: "IMPORTANT: Call this FIRST. Returns the guide overview and lists all available rule tools." },
-  async () => ({ content: [{ type: "text", text: RULE_INDEX }] })
-);
-
-export const ruleReactCode = server.tool(
-  { name: "rule_react_code", description: "Project code reference: file structure, supported imports, component/props patterns" },
-  async () => ({ content: [{ type: "text", text: RULE_REACT_CODE }] })
-);
-
-export const ruleRemotionAnimations = server.tool(
-  { name: "rule_remotion_animations", description: "Remotion animations: useCurrentFrame, frame-driven animation fundamentals" },
-  async () => ({ content: [{ type: "text", text: RULE_REMOTION_ANIMATIONS }] })
-);
-
-export const ruleRemotionTiming = server.tool(
-  { name: "rule_remotion_timing", description: "Remotion timing: interpolate, spring, Easing, spring configs, delay, duration" },
-  async () => ({ content: [{ type: "text", text: RULE_REMOTION_TIMING }] })
-);
-
-export const ruleRemotionSequencing = server.tool(
-  { name: "rule_remotion_sequencing", description: "Remotion sequencing: Sequence, delay, nested timing, local frames" },
-  async () => ({ content: [{ type: "text", text: RULE_REMOTION_SEQUENCING }] })
-);
-
-export const ruleRemotionTransitions = server.tool(
-  { name: "rule_remotion_transitions", description: "Remotion transitions: TransitionSeries, fade, slide, wipe, flip, duration calculation" },
-  async () => ({ content: [{ type: "text", text: RULE_REMOTION_TRANSITIONS }] })
-);
-
-export const ruleRemotionTextAnimations = server.tool(
-  { name: "rule_remotion_text_animations", description: "Remotion text: typewriter effect, word highlighting, string slicing" },
-  async () => ({ content: [{ type: "text", text: RULE_REMOTION_TEXT_ANIMATIONS }] })
-);
-
-export const ruleRemotionTrimming = server.tool(
-  { name: "rule_remotion_trimming", description: "Remotion trimming: cut start/end of animations with negative Sequence from" },
-  async () => ({ content: [{ type: "text", text: RULE_REMOTION_TRIMMING }] })
-);
 
 // --- Video tool ---
 

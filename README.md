@@ -50,7 +50,7 @@ https://still-feather-l5mwy.run.mcp-use.com/mcp
 
 This is an **MCP App** — an MCP server paired with a UI View. The two pieces work together:
 
-1. **MCP Server** -- exposes `create_video` tool + rule tools for teaching Remotion patterns
+1. **MCP Server** -- exposes the `create_video` tool and an importable Remotion skill
 2. **View** -- a Remotion Player that renders inline in the chat and receives compiled bundles from the server
 
 The flow:
@@ -77,19 +77,18 @@ Model                     MCP App (Server + View)
 
 The server exposes one model-visible tool, `create_video`, for the initial composition. Once its View is mounted, the View exposes an ephemeral `update_video` tool. That tool reuses the server compiler, merges only the changed files with the current session project, and replaces the mounted player without creating another View result.
 
-### Rule tools
+### Remotion skill over MCP
 
-The server includes teaching tools derived from the [remotion-best-practices](https://github.com/remotion-dev/skills) skill that the model can call to learn Remotion patterns:
+The server publishes `remotion-video-creation` through OpenAI's bounded
+[MCP skills extension](https://developers.openai.com/plugins/build/mcp-server#import-skills-from-the-mcp-server).
+The skill contains the workflow and focused references for project structure,
+animation, timing, sequencing, transitions, text animation, and trimming.
 
-| Tool | Topic |
-|------|-------|
-| `rule_react_code` | Project structure, imports, entry file contract |
-| `rule_remotion_animations` | `useCurrentFrame`, frame-driven animation |
-| `rule_remotion_timing` | `interpolate`, `spring`, `Easing` configs |
-| `rule_remotion_sequencing` | `Sequence`, scene management, duration |
-| `rule_remotion_transitions` | `TransitionSeries`, fade, slide, wipe |
-| `rule_remotion_text_animations` | Typewriter effect, word highlighting |
-| `rule_remotion_trimming` | Trimming with negative `Sequence` from |
+Compatible clients discover it through `skills/list`, fetch its catalog entry
+through `skills/get`, and read each digest-addressed file through standard
+`resources/read`. This keeps instructional content out of the tool list:
+`create_video` remains the only model-visible server tool. Imported skills are
+snapshots, so rescan the connector after publishing skill changes.
 
 ### View (the "App" part)
 
@@ -147,9 +146,13 @@ npm run deploy
 
 ```
 index.ts                     -- MCP server, tool definitions, handler
+skill-extension.ts           -- skills/list, skills/get, resources, capability advertisement
 utils.ts                     -- esbuild compilation, session state, response helpers
 types.ts                     -- Shared types (VideoProjectData, VideoMeta)
-rules/                       -- Remotion teaching content served by rule tools
+skills/remotion-video-creation/
+  SKILL.md                   -- Imported workflow and skill metadata
+  agents/openai.yaml         -- Dependency on the hosted Remotion MCP server
+  references/                -- Focused Remotion implementation guidance
 views/remotion-player/       -- MCP App View (React + Remotion Player)
   view.tsx                   -- Main View component
   types.ts                   -- Browser-only View types and runtime constants
@@ -194,4 +197,4 @@ Note: [Remotion](https://remotion.dev) is a dependency with its own license. Fre
 
 ---
 
-Built with [mcp-use](https://mcp-use.com) and [Remotion](https://remotion.dev). Rule tools adapted from the [remotion-best-practices](https://github.com/remotion-dev/skills) skill by Remotion.
+Built with [mcp-use](https://mcp-use.com) and [Remotion](https://remotion.dev). Skill guidance adapted from the [remotion-best-practices](https://github.com/remotion-dev/skills) skill by Remotion.
