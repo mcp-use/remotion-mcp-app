@@ -205,6 +205,11 @@ function addRemotionCompileHints(message: string): string {
   if (message.toLowerCase().includes("unterminated string literal")) {
     hints.push("Hint: check for missing quote characters in JSX style/object literals.");
   }
+  if (message.includes("without an output path configured")) {
+    hints.push(
+      "Hint: stylesheet imports are not supported here. Move the rules into inline style objects on the element."
+    );
+  }
 
   if (!hints.length) {
     return message;
