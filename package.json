@@ -25,7 +25,7 @@
     "@paper-design/shaders-react": "^0.0.71",
     "@remotion/player": "4.0.268",
     "@remotion/transitions": "4.0.268",
-    "mcp-use": "^1.21.4",
+    "mcp-use": "1.34.8",
     "node-mocks-http": "^1.17.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
